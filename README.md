@@ -39,16 +39,27 @@ git clone this repository or download the zip file and unzip it.
 
 # demo use
 cd to the directory containing the 3 python files.
+
 start the pigpio daemon if it is not already running I use `sudo gpiod -c 256`
+
 At the moment the gpio pins are set in the chipdrive module around line 40. You may need to change these depending on how you wired the hardware.
+
 run python3 and in the console:
+
 `import chipdrive`
+
 `mot=chipdrive.tmc5130(stepsPerRev=xxx)`    # set xxx to your motor's full steps per rev count
+
 `mot.goto(100)`                             # The motor will ramp up then down and stop at 100 revs
+
 `mot.goto(500)`                             # the motor will ramp up then down, moving an additional 400 revs
+
 `mot.goto(25)`                              # the motor will backup to 25 revs from initial position.
+
 `mot.close()`                               # close the motor, release resources
+
 `exit()`                                    # close python
+
 The default for goto monitors the chip's status, reporting position and speed. Once the motor reaches the target position , it disables the chip's output stage and returns. Disabling the chip's output stage does mean the motor moves slightly, but it prevents the motor from heating up if the current limit is too high.
 
 The ramping is set to slow values so it is easy to see and hear what is happening, these values, as well as the maximum speed can all be tuned.

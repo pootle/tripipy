@@ -15,7 +15,7 @@ This driver is far easier to install and run than the example code on the trinam
 requres installation of both bcm2835 drivers and wiringpi, neither of which are standard on raspbian lite, and require
 local compilation.
 
-This has not yet been tested with more than 1 motor.
+I've run this with 2 motors on the base Raspiberry Pi SPI interface
 
 ## Software Dependencies
 This package is Python3, and requires pigpio to be running.

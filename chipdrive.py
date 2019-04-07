@@ -10,6 +10,7 @@ import logging
 import pigpio
 import time
 import sys
+from collections import OrderedDict
 
 import trinamicDriver, tmc5130regs
 
@@ -39,22 +40,23 @@ class tmc5130():
         self.uStepsToRPM =  60 * self.clockfrequ / 2**24 / self.ustepsPerRev
         self.md=trinamicDriver.TrinamicDriver(clockfrequ=self.clockfrequ, datarate=1000000, pigp=self.pg,
                 motordef=tmc5130regs.tmc5130, drvenpin=12, spiChannel=1, loglvl=loglvl )
-        regsettings={'GSTAT':0
-                ,'GCONF':4
-                ,'CHOPCONF': 0x000100C3
-                ,'IHOLD_IRUN': 0x00080F0A
-                ,'TPOWERDOWN': 0x0000000A
-                ,'TPWMTHRS': 0x000001F4
-                ,'VSTART': 1
-                ,'A1': 1500
-                ,'V1': 100000
-                ,'AMAX': 1000
-                ,'VMAX': self.maxV
-                ,'DMAX': 1100
-                ,'D1': 600
-                ,'VSTOP': 10
-                ,'RAMPMODE':0
-                 }
+        regsettings=OrderedDict((
+                ('GSTAT',0),
+                ('GCONF',4),
+                ('CHOPCONF', 0x000100C3),
+                ('IHOLD_IRUN', 0x00080F0A),
+                ('TPOWERDOWN', 0x0000000A),
+                ('TPWMTHRS', 0x000001F4),
+                ('VSTART', 1),
+                ('A1', 1500),
+                ('V1', 100000),
+                ('AMAX', 1000),
+                ('VMAX', self.maxV),
+                ('DMAX', 1100),
+                ('D1', 600),
+                ('VSTOP', 10),
+                ('RAMPMODE',0)
+                 ))
         regactions='RUWWWWWWWWWWWWW'
         assert len(regsettings)==len(regactions)
         currently=self.md.readWriteMultiple(regsettings,regactions)

@@ -58,8 +58,7 @@ class TrinamicDriver():
         
         clockfrequ: If None the clock pin is set low so the chip uses its internal clock, otherwise the frequency in Hz (10000000 is good)
         
-        pigp:       instance of pigpio to use, if an instance of pigpio.pi, that is used, otherwise a new instance 
-                    is created (which will be closed when the motor instance is closed or discarded)
+        pigp:       instance of pigpio to use
 
         motordef:   Definitions of the the various registers and other motor information
         
@@ -70,15 +69,7 @@ class TrinamicDriver():
                     loglvl string 'commands' uses logging DEBUG logging logical activity in SPI interface to logger <classname>.<name>.<SPI>
                     loglvl string 'all' does both rawspi and commands logging
         """
-        if pigp is None:
-           self.pigp=pigpio.pi()
-           self.mygp=True
-        if isinstance(pigp,pigpio.pi):
-            self.pigp=pigp
-            self.mygp=False
-        else:
-            self.pigp=pigpio.pi(**pigp)
-            self.mygp=True
+        self.pigp=pigp
         if not self.pigp.connected:
             logging.getLogger().critical("pigpio daemon does not appear to be running")
             self.pigp=None          # this is used as a master control to enable / disable all functionality
@@ -111,6 +102,7 @@ class TrinamicDriver():
         self.motordef=motordef
         self.regdefs=self.motordef['regNames']
         self.status=0
+        self.lastwritten={}     # a dict of the last value written to each register
         if self.logger:
             self.logger.info("controller initialised using spi {spi} on channel {spich}, {clock}.".format(
                     spi='master' if self.masterspi else 'aux'
@@ -179,6 +171,7 @@ class TrinamicDriver():
             , (valueint>>8) & 255
             , valueint & 255])
         self.pigp.spi_write(self.spidev, ba)
+        self.lastwritten[regName]=regValue
         if self.SPIrawlog:
             self.SPIrawlog.debug('SPI_WRITE: ' + ':'.join("{:02x}".format(c) for c in ba))
         if self.SPIlog:
@@ -263,6 +256,7 @@ class TrinamicDriver():
                 , (valueint>>16) & 255
                 , (valueint>>8) & 255
                 , valueint & 255]
+            self.lastwritten[prevname]=valueint
             if self.SPIlog:
                 self.SPIlog.log(self.loglvl,"WRITE" + " {regname:10s}: {regval:9d} ({regval:08x}) raw: {raw}".format(
                     regname=str(prevname), regval=valueint, raw=":".join("{:02x}".format(c) for c in ba)))
@@ -283,6 +277,7 @@ class TrinamicDriver():
                 ba[2] = (valueint>>16) & 255
                 ba[3] = (valueint>>8) & 255
                 ba[4] = valueint & 255
+                self.lastwritten[reg]=valueint
                 if self.SPIlog:
                     self.SPIlog.log(self.loglvl,"WRITE" + " {regname:10s}: {regval:9d} ({regval:08x}) raw: {raw}".format(
                         regname=str(reg), regval=valueint, raw=":".join("{:02x}".format(c) for c in ba)))
@@ -337,8 +332,6 @@ class TrinamicDriver():
         if not self.clockpin is None:
             if not self.clockfrequ is None:
                 self.pigp.hardware_clock(self.clockpin, 0)            
-        if self.mygp and not self.pigp is None:
-            self.pigp.stop()
         self.pigp=None
         if self.logger:
             self.logger.info("controller shut down")

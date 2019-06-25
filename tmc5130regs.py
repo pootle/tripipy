@@ -12,7 +12,7 @@ def bytesToSigned32(bytearr):
 
 def bytesToSigned24(bytearr):
     """
-    converts the last 4 bytes of a 5 byte array to a signed integer
+    converts the last 3 bytes of a 5 byte array to a signed integer
     """
     unsigned=(bytearr[2]<<16)+(bytearr[3]<<8)+bytearr[4]
     return unsigned-16777216 if bytearr[2]&128 else unsigned

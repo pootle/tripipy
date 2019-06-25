@@ -20,6 +20,8 @@ I've run this with 2 motors on the base Raspiberry Pi SPI interface
 ## Software Dependencies
 This package is Python3, and requires pigpio to be running.
 
+`sudo apt-get install python3-pigpio
+
 ## Hardware dependencies
 The driver uses 1 SPI channel per motor control chip, and 3 gpio pins:
 You should use the Raspberry pi gpio harware clock (GPIO 4) This can be shared if you have more than 1 motor controller.

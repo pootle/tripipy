@@ -99,7 +99,7 @@ class tmc5130():
         if 'maxrpm' in updates:
             self.settings['maxrpm']=updates['maxrpm']
             self.maxV=round(self.RPMtoVREG(self.settings['maxrpm']))
-            if 'VMAX' in self.md.lastwritten and self.md.lastwritten['VMAX'] > self.maxV and not 'VMAX'] in pendregs:
+            if 'VMAX' in self.md.lastwritten and self.md.lastwritten['VMAX'] > self.maxV and not 'VMAX' in pendregs:
                 pendregs.append('VMAX')
         
     def wait_reached(self, ticktime=.5):

@@ -50,17 +50,17 @@ run python3 and in the console:
 
 `import chipdrive`
 
-`mot=chipdrive.tmc5130(stepsPerRev=xxx)`    # set xxx to your motor's full steps per rev count
+`mot=chipdrive.tmc5130()`    # see code fir settings you may need to change
 
-`mot.goto(100)`                             # The motor will ramp up then down and stop at 100 revs
+`mot.goto(10)`               # The motor will ramp up then down and stop at 100 revs
 
-`mot.goto(500)`                             # the motor will ramp up then down, moving an additional 400 revs
+`mot.goto(5)`                # the motor will ramp up then down, moving an additional 400 revs
 
-`mot.goto(25)`                              # the motor will backup to 25 revs from initial position.
+`mot.goto(-3)`               # the motor will backup to 25 revs from initial position.
 
-`mot.close()`                               # close the motor, release resources
+`mot.close()`                # close the motor, release resources
 
-`exit()`                                    # close python
+`exit()`                     # close python
 
 The default for goto monitors the chip's status, reporting position and speed. Once the motor reaches the target position , it disables the chip's output stage and returns. Disabling the chip's output stage does mean the motor moves slightly, but it prevents the motor from heating up if the current limit is too high.
 

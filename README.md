@@ -20,6 +20,7 @@ This package is Python3, and requires pigpio to be running, it also uses guizero
 The testing interface requires raspbian or raspbian-full.
 
 `sudo apt-get install python3-pigpio
+
 `sudo pip3 install guizero
 
 ## Hardware dependencies
@@ -44,9 +45,12 @@ There are 5 python files:
 
 
 # Installation
+
 - git clone this repository or download the zip file and unzip it.
- -install python3-pigpio
- -install guizero
+
+-install python3-pigpio
+
+-install guizero
 
 # demo use
 cd to the directory containing the 3 python files.
@@ -56,6 +60,7 @@ start the pigpio daemon if it is not already running I use `sudo gpiod -c 256`
 At the moment the gpio pins are set in the chipdrive module around line 40. You may need to change these depending on how you wired the hardware.
 
 run the app:
+
 `python3 motor2.py
 
 Select the mode to use:

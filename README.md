@@ -20,8 +20,7 @@ This package is Python3, and requires pigpio to be running, it also uses guizero
 The testing interface requires raspbian or raspbian-full.
 
 ` sudo apt-get install python3-pigpio
-
-` sudo pip3 install guizero
+ sudo pip3 install guizero`
 
 ## Hardware dependencies
 The driver uses 1 SPI channel per motor control chip, and 3 gpio pins:
@@ -61,7 +60,7 @@ At the moment the gpio pins are set in the chipdrive module around line 40. You 
 
 run the app:
 
-`python3 motor2.py
+`python3 motor2.py`
 
 Select the mode to use:
 `goto target: the chip drives the motor to reach the target  -  set a target posn before ppressing ACTION!

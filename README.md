@@ -19,8 +19,9 @@ I've run this with 2 motors on the base Raspiberry Pi SPI interface
 This package is Python3, and requires pigpio to be running, it also uses guizero to provide a simple testing interface.
 The testing interface requires raspbian or raspbian-full.
 
-` sudo apt-get install python3-pigpio
- sudo pip3 install guizero`
+` sudo apt-get install python3-pigpio`
+
+` sudo pip3 install guizero`
 
 ## Hardware dependencies
 The driver uses 1 SPI channel per motor control chip, and 3 gpio pins:

@@ -9,8 +9,6 @@ and ramping available.
 I have used the SPI interface to control the chip as this enables control of at least a couple of motors with minimal
 effort - 2 tmc5130s can be mounted on an adafruit prototyping hat making a nice compact controller.
 
-So far the driver is pretty simplistic, but it does have good diagnstics and behaves fairly well.
-
 This driver is far easier to install and run than the example code on the trinamic website. Their example code 
 requres installation of both bcm2835 drivers and wiringpi, neither of which are standard on raspbian lite, and require
 local compilation.
@@ -18,26 +16,37 @@ local compilation.
 I've run this with 2 motors on the base Raspiberry Pi SPI interface
 
 ## Software Dependencies
-This package is Python3, and requires pigpio to be running.
+This package is Python3, and requires pigpio to be running, it also uses guizero to provide a simple testing interface.
+The testing interface requires raspbian or raspbian-full.
 
 `sudo apt-get install python3-pigpio
+`sudo pip3 install guizero
 
 ## Hardware dependencies
 The driver uses 1 SPI channel per motor control chip, and 3 gpio pins:
 You should use the Raspberry pi gpio harware clock (GPIO 4) This can be shared if you have more than 1 motor controller.
-The other 2 pins (output stage enable and vcc-io / reset) can potentially be any ordinary gpio pin. The gpio pins and SPI settings are settable on the contructor interface for trinamicDriver.TrinamicDriver.
+The other 2 pins (output stage enable and vcc-io / reset) can potentially be any ordinary gpio pin. The gpio pins and SPI 
+settings are settable on the contructor interface for trinamicDriver.TrinamicDriver.
 
 You will need a stepper motor and a suitable power supply.
 
 ## Overview
-There are 3 files required:
-- TrinamicDriver.py: (400 lines) This sets up and drives the SPI interface as well as the 3 straight gpio pins required by the tmc5130. I have tested this on the primary SPI interface using both available channels. It may not work on the Aux SPI interface as this may not support mode 3 SPI. It provides methods to read and write the chip's registers as well as chip reset and enabling the output stage.
-- tmc5130regs.py: (120 lines) This contains mappings for all the register names and some of the bit flag registers to make usage more readable.
-- chipdrive.py: (100 lines) This contains a single class, each instance can control a single motor. It can be used directly from the Python command line for testing and experimentation.
+There are 5 python files:
+- TrinamicDriver.py: (480 lines) This sets up and drives the SPI interface as well as the 3 straight gpio pins required by the tmc5130. 
+  I have tested this on the primary SPI interface using both available channels. It may not work on the Aux SPI interface as this may not 
+  support mode 3 SPI. It provides methods to read and write the chip's registers as well as chip reset and enabling the output stage.
+- tmc5130regs.py: (170 lines) This contains mappings for all the register names and some of the bit flag registers defined as IntFlags
+  to make usage more readable. Each of the chip's registers is defined as an instance of a register class.
+- chipdrive.py: (250 lines) This contains a class tmc5130, each instance can control a single motor. There is a sample app (motors3.py) that 
+  can drive the motor displaying live status as the motor runs
+- treedict.py: a utility class that provides simple access to the chip register classes
+- motor2.py: a sample app, built using guizero to provide a simple gui to control the chip / motor.
 
 
 # Installation
-git clone this repository or download the zip file and unzip it.
+- git clone this repository or download the zip file and unzip it.
+ -install python3-pigpio
+ -install guizero
 
 # demo use
 cd to the directory containing the 3 python files.
@@ -46,22 +55,9 @@ start the pigpio daemon if it is not already running I use `sudo gpiod -c 256`
 
 At the moment the gpio pins are set in the chipdrive module around line 40. You may need to change these depending on how you wired the hardware.
 
-run python3 and in the console:
+run the app:
+`python3 motor2.py
 
-`import chipdrive`
-
-`mot=chipdrive.tmc5130()`    # see code fir settings you may need to change
-
-`mot.goto(10)`               # The motor will ramp up then down and stop at 100 revs
-
-`mot.goto(5)`                # the motor will ramp up then down, moving an additional 400 revs
-
-`mot.goto(-3)`               # the motor will backup to 25 revs from initial position.
-
-`mot.close()`                # close the motor, release resources
-
-`exit()`                     # close python
-
-The default for goto monitors the chip's status, reporting position and speed. Once the motor reaches the target position , it disables the chip's output stage and returns. Disabling the chip's output stage does mean the motor moves slightly, but it prevents the motor from heating up if the current limit is too high.
-
-The ramping is set to slow values so it is easy to see and hear what is happening, these values, as well as the maximum speed can all be tuned.
+Select the mode to use:
+`goto target: the chip drives the motor to reach the target  -  set a target posn before ppressing ACTION!
+  

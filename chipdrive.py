@@ -136,7 +136,7 @@ class tmc5130(trinamicDriver.TrinamicDriver):
 #        self.maxV=round(self.RPMtoVREG(self['settings/maxrpm'].getCurrent()))
         regsettings=OrderedDict((   # base set of register values to get started
                 ('GSTAT',0),
-                ('GCONF',4),
+                ('GCONF', tmc5130regs.GCONFflags.en_pwm_mode),
                 ('CHOPCONF', 0x000100C3),
                 ('IHOLD_IRUN', 0x00080F0A),
                 ('TPOWERDOWN', 0x0000000A),
@@ -196,20 +196,21 @@ class tmc5130(trinamicDriver.TrinamicDriver):
         time.sleep(ticktime)
         reads={'VACTUAL':0, 'XACTUAL':0, 'XTARGET':0, 'GSTAT':0, 'RAMPSTAT':0}
         self.readWriteMultiple(reads, 'R')
-        while not motorStatus.at_position in self.status:
+        while not motorStatus.at_position in self['chipregs/SHORTSTAT'].curval:
             print('loc    {location:9.2f}   chipVelocity  {velocity:9.2f}'.format(location=reads['XACTUAL']/self['settings/uStepsPerRev'].getCurrent(), velocity=reads['VACTUAL']))
-            print('ramp status: %s' % self.status)
+            print('ramp status: %s' % self['chipregs/SHORTSTAT'].curval)
             time.sleep(ticktime)
             self.readWriteMultiple(reads, 'R')
         self.enableOutput(False)
-        print('target %9.4f reached (%d), status: %x, ramp status %s' % (reads['XACTUAL']/self['settings/uStepsPerRev'].getCurrent(), reads['XACTUAL'], self.status, reads['RAMPSTAT']))
+        print('target %9.4f reached (%d), status: %x, ramp status %s' % (reads['XACTUAL']/self['settings/uStepsPerRev'].getCurrent(), reads['XACTUAL'], 
+                    self['chipregs/SHORTSTAT'].curval, reads['RAMPSTAT']))
 
     def waitStop(self, ticktime):
         time.sleep(ticktime)
         while self.readInt('VACTUAL') != 0:
             time.sleep(ticktime)
 
-    def goto(self, targetpos, speed=None):
+    def goto(self, targetpos, speed=None, wait=False):
         regupdates=OrderedDict((
             ('VMAX', round(self.RPMtoVREG(self['settings/maxrpm'].getCurrent() if speed is None else speed))),
             ('XTARGET', round(self['settings/uStepsPerRev'].getCurrent()*targetpos)),
@@ -218,6 +219,9 @@ class tmc5130(trinamicDriver.TrinamicDriver):
         self.enableOutput(True)
         self.readWriteMultiple(regupdates,'W')
         print('requested %d, recorded %d' % (regupdates['VMAX'], self['chipregs/VMAX'].curval))
+        if wait:
+            self.wait_reached()
+            self.enableOutput(False)
 
     def setspeed(self, speed):
         regupdates=OrderedDict((

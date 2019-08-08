@@ -1,6 +1,7 @@
 import guizero as gz
 import time
 import chipdrive
+import tmc5130regs
 import sys
 
 def ticker():
@@ -46,6 +47,23 @@ class Ffield(Ftext):
 
     def makeString(self):
         return self.format.format(self.getValue())
+
+    def update(self):
+        self.value=self.makeString()
+
+class BitField(Ftext):
+    """
+    The displayed value is a single bitFlag
+    """
+    def __init__(self, motorfield, flagbit, textOn='Y', textOff='', **kwargs):
+        self.motorfield=motorfield
+        self.flagbit=flagbit
+        self.textOn=textOn
+        self.textOff=textOff
+        super().__init__(**kwargs)
+
+    def makeString(self):
+        return self.textOn if self.mpanel.motor[self.motorfield].testFlag(self.flagbit) else self.textOff
 
     def update(self):
         self.value=self.makeString()
@@ -144,9 +162,11 @@ motorfields=(
     ('runtype',  gz.Text, {'text': 'run type:',  'align': 'right'}, EdChoice,    {'options': ['goto target', 'run forward', 'run reverse']}),
     ('speed',    gz.Text, {'text': 'speed:',     'align': 'right'}, EdChoice,    {'options': ['max rpm', 'real time', 'reverse time', 'double speed', 'target']}),
     ('userpm',   gz.Text, {'text': 'target rpm:','align': 'right'}, EdFloat,     {'minval': -100000, 'maxval': 1000000, 'align': 'left'}),
-    ('targetpos',gz.Text, {'text': 'target posn:','align': 'right'}, EdFloat,     {'minval':None, 'maxval': None, 'align': 'left'}),
+    ('targetpos',gz.Text, {'text': 'target posn:','align': 'right'}, EdFloat,    {'minval':None, 'maxval': None, 'align': 'left'}),
     ('action',   gz.Text, {'text': 'do it NOW!', 'align': 'right'}, Button,      {'text': 'ACTION!', 'command': '../actionButton'}),
-    ('posn',     gz.Text, {'text': 'current posn:','align': 'right'}, Ffield,     {'motorfield':'settings/posn', 'format': '{:5.2f}', 'align':'left'}),
+    ('stat_atpos',gz.Text,{'text': 'at posn'},                      BitField,    {'motorfield': 'chipregs/SHORTSTAT', 'flagbit': tmc5130regs.statusFlags.at_position,}),
+    ('stat_atmax',gz.Text,{'text': 'at max rpm'},                   BitField,    {'motorfield': 'chipregs/SHORTSTAT', 'flagbit': tmc5130regs.statusFlags.at_VMAX,}),
+    ('posn',     gz.Text, {'text': 'current posn:','align': 'right'}, Ffield,    {'motorfield':'settings/posn', 'format': '{:5.2f}', 'align':'left'}),
     ('XACTUAL',  gz.Text, {'text': 'XACTUAL:',   'align': 'right'}, Ffield,      {'motorfield': 'chipregs/XACTUAL', 'format': '{:7d}', 'align': 'left'}),
     ('XTARGET',  gz.Text, {'text': 'XTARGET:',   'align': 'right'}, Ffield,      {'motorfield': 'chipregs/XTARGET', 'format': '{:7d}', 'align': 'left'}),
     ('currpm',   gz.Text, {'text': 'current rpm:','align':'right'}, Ffield,      {'motorfield': 'settings/rpmnow', 'format': '{:5.2f}', 'align': 'left'}),
@@ -170,7 +190,7 @@ class motorPanel():
                 self.mfields[k]=v['class'](mpanel=self, grid=[gridx,v['y']], **v['kwargs'])
 
     def ticker(self):
-        reads={'VACTUAL':0, 'XACTUAL':0, 'XTARGET':0, 'VACTUAL': 0, 'GSTAT':0, 'RAMPSTAT':0}
+        reads={'VACTUAL':0, 'XACTUAL':0, 'XTARGET':0, 'VACTUAL': 0, 'GSTAT':0}
         self.motor.readWriteMultiple(reads, 'R')
         self.mfields['XACTUAL'].update()
         self.mfields['posn'].update()
@@ -178,6 +198,8 @@ class motorPanel():
         self.mfields['currpm'].update()
         self.mfields['XTARGET'].update()
         self.mfields['VMAX'].update()
+        self.mfields['stat_atpos'].update()
+        self.mfields['stat_atmax'].update()
 
     def close(self):
         self.motor.close()

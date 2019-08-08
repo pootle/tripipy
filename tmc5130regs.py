@@ -1,27 +1,11 @@
 #!/usr/bin/python3
 """
 This defines the registers accessible via SPI for a tmc5130
+
+This is based on the TMC5130A DATASHEET (Rev. 1.15 / 2018-JUL-11)
 """
 
 from enum import IntFlag
-
-def xbytesToSigned32(bytearr):
-    """
-    converts the last 4 bytes of a 5 byte array to a signed integer
-    """
-    unsigned=(bytearr[1]<<24)+(bytearr[2]<<16)+(bytearr[3]<<8)+bytearr[4]
-    return unsigned-4294967296 if bytearr[1]&128 else unsigned
-
-def xbytesToSigned24(bytearr):
-    """
-    converts the last 3 bytes of a 5 byte array to a signed integer
-    """
-    unsigned=(bytearr[2]<<16)+(bytearr[3]<<8)+bytearr[4]
-    return unsigned-16777216 if bytearr[2]&128 else unsigned
-
-
-def xbytesToUnsigned(bytearr):
-    return (bytearr[1]<<24)+(bytearr[2]<<16)+(bytearr[3]<<8)+bytearr[4]
 
 addr="addr"
 mode="mode"
@@ -65,8 +49,34 @@ class rampFlags(IntFlag):
     reversed_dir        = 0x1000
     stall_guard_active  = 0x2000
 
+class GCONFflags(IntFlag):
+    """
+    The flag bits in register GCONF
+    """
+    NONE                = 0
+    I_scale_analog      = 1
+    internal_Rsense     = 2
+    en_pwm_mode         = 4
+    enc_commutation     = 8
+    shaft               = 2**4      # reverses motor rotation
+    diag0_error         = 2**5
+    diag0_otpw          = 2**6
+    diag0_stall         = 2**7
+    diag1_stall         = 2**8
+    diag1_index         = 2**9
+    diag1_onstate       = 2**10
+    diag1_steps_skipped = 2**11
+    diag0_int_pushpull  = 2**12
+    diag1_poscomp_pushpull=2**13
+    small_hysteresis    = 2**14
+    stop_enable         = 2**15
+    direct_mode         = 2**16
+    test_mode           = 2**17
+
 _regset={
-    "GCONF":      {rclass: 'triHex',        rargs: {addr: 0x00, access: "RW", 'logacts': ('constructors', 'resolve', 'content')}},
+    "SHORTSTAT":  {rclass: 'triByteFlags',  rargs: {'flagClass': statusFlags}},
+#    "GCONF":      {rclass: 'triHex',        rargs: {addr: 0x00, access: "RW", 'logacts': ('constructors', 'resolve', 'content')}},
+    "GCONF":      {rclass: 'triFlags',      rargs: {addr: 0x00, access: "RW", 'flagClass': rampFlags}}, 
     "GSTAT":      {rclass: 'triHex',        rargs: {addr: 0x01, access: "R",  'logacts': ('constructors', 'resolve', 'content')}},
     "IFCNT":      {rclass: 'triHex',        rargs: {addr: 0x02, access: "",   'logacts': ('constructors', 'resolve', 'content')}},
     "SLAVECONF":  {rclass: 'triHex',        rargs: {addr: 0x03, access: "",   'logacts': ('constructors', 'resolve', 'content')}},
@@ -81,10 +91,10 @@ _regset={
     "THIGH":      {rclass: 'triHex',        rargs: {addr: 0x15, access: "W",  'logacts': ('constructors', 'resolve', 'content')}},
 
     "RAMPMODE":   {rclass: 'triHex',        rargs: {addr: 0x20, access: "RW", 'logacts': ('constructors', 'resolve', 'content')}},
-    "XACTUAL":    {rclass: 'triSignedint',  rargs: {addr: 0x21, access: "RW",sigbits: 32, 'logacts': ('constructors', 'resolve', 'content')}},
-    "VACTUAL":    {rclass: 'triSignedint',  rargs: {addr: 0x22, access: "RW",sigbits: 24, 'logacts': ('constructors', 'resolve', 'content')}},
-    "VSTART":     {rclass: 'triPosint',     rargs: {addr: 0x23, access: "W", sigbits: 18, 'logacts': ('constructors', 'resolve', 'content')}},
-    "A1":         {rclass: 'triPosint',     rargs: {addr: 0x24, access: "W", sigbits: 16, 'logacts': ('constructors', 'resolve', 'content')}},
+    "XACTUAL":    {rclass: 'triSignedint',  rargs: {addr: 0x21, access: "RW"  ,sigbits: 32, 'logacts': ('constructors', 'resolve', 'content')}},
+    "VACTUAL":    {rclass: 'triSignedint',  rargs: {addr: 0x22, access: "RW",  sigbits: 24, 'logacts': ('constructors', 'resolve', 'content')}},
+    "VSTART":     {rclass: 'triPosint',     rargs: {addr: 0x23, access: "W",   sigbits: 18, 'logacts': ('constructors', 'resolve', 'content')}},
+    "A1":         {rclass: 'triPosint',     rargs: {addr: 0x24, access: "W",   sigbits: 16, 'logacts': ('constructors', 'resolve', 'content')}},
     "V1":         {rclass: 'triPosint',     rargs: {addr: 0x25, access: "W", sigbits: 20, 'logacts': ('constructors', 'resolve', 'content')}},
     "AMAX":       {rclass: 'triPosint',     rargs: {addr: 0x26, access: "W", sigbits: 16, 'logacts': ('constructors', 'resolve', 'content')}},
     "VMAX":       {rclass: 'triPosint',     rargs: {addr: 0x27, access: "W", sigbits: 23, maxval: 2**23-512, 'logacts': ('constructors', 'resolve', 'content')}},
@@ -98,7 +108,7 @@ _regset={
     "SWMODE":     {rclass: 'triHex',        rargs: {addr: 0x34, access: "RW", 'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x34, mode:"RW"},
 #    "RAMPSTAT":   {addr: 0x35, mode:"RC"},
     'RAMPSTAT':   {rclass: 'triFlags',      rargs: {addr: 0x35, access: "R",  'flagClass': rampFlags}},
-    "XLATCH":     {rclass: 'triHex',        rargs: {addr: 0x36, access: "R", 'logacts': ('constructors', 'resolve', 'content')}},# {addr: 0x36, mode:"R"},
+    "XLATCH":     {rclass: 'triHex',        rargs: {addr: 0x36, access: "R",  'logacts': ('constructors', 'resolve', 'content')}},# {addr: 0x36, mode:"R"},
 
     "ENCMODE":    {rclass: 'triHex',        rargs: {addr: 0x38, access: "RW", 'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x38, mode:"RW"},
     "XENC":       {rclass: 'triHex',        rargs: {addr: 0x39, access: "RW", 'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x39, mode:"RW"},
@@ -131,7 +141,7 @@ _regset={
 
 tmc5130={
     'regNames'     : _regset,
-    'statusClass'  : statusFlags,
+#    'statusClass'  : statusFlags,
 }
 """	stuff that might be useful later
     // ramp modes (Register TMC5130_RAMPMODE)

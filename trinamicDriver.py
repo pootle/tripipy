@@ -105,9 +105,9 @@ class TrinamicDriver(treedict.Tree_dict):
         self.motordef=motordef
         regs=self.makeChild(_cclass=treedict.Tree_dict, name='chipregs')
         for rn, rdef in self.motordef['regNames'].items():
-            rc={'triPosint': triPosint, 'triSignedint': triSignedint, 'triFlags': triFlags, 'triHex': triHex}[rdef['rclass']]
-            regs.makeChild(_cclass=rc, name=rn, **rdef['rargs'])  
-        self.status=self.motordef['statusClass'](0)
+            rc={'triPosint': triPosint, 'triSignedint': triSignedint, 'triFlags': triFlags, 'triHex': triHex, 'triByteFlags': triByteFlags}[rdef['rclass']]
+            regs.makeChild(_cclass=rc, name=rn, **rdef['rargs'])
+        regs['SHORTSTAT'].loadByte(0)
         if self.logger:
             self.logger.info("controller initialised using spi {spi} on channel {spich}, {clock}.".format(
                     spi='master' if self.masterspi else 'aux',
@@ -182,7 +182,7 @@ class TrinamicDriver(treedict.Tree_dict):
 
     def readInt(self, regName):
         """
-        immediately reads a single register in the Trinamic chip. Records the status in self.status
+        immediately reads a single register in the Trinamic chip. Records the status in SHORTSTAT register
         
         Note: if you want to read multiple registers, use readWriteMultiple.
 
@@ -204,7 +204,7 @@ class TrinamicDriver(treedict.Tree_dict):
             self.SPIrawlog.debug('SPI_XFER : ' + ':'.join("{:02x}".format(c) for c in ba) + ' returned ' + ':'.join("{:02x}".format(c) for c in bytesback))
         rrr.loadBytes(bytesback)
         resint=rrr.curval
-        self.status=self.motordef['statusClass'](bytesback[0])
+        self['chipregs/SHORTSTAT'].loadByte(bytesback[0])
         if self.SPIlog:
             clockns=time.perf_counter_ns()-cstart
             cpuratio=(time.process_time_ns()-cpustart)/clockns*100
@@ -214,7 +214,7 @@ class TrinamicDriver(treedict.Tree_dict):
 
     def readWriteMultiple(self, regNameList, regActions='R'):
         """
-        Immediately reads and writes multiple registers in a single pass. Records the status of the final exchange in self.status.
+        Immediately reads and writes multiple registers in a single pass. Records the status of the final exchange in SHORTSTAT register
         
         Somewhat more efficient than reading / writing 1 at a time due to the way the chip interface works.
 
@@ -284,7 +284,7 @@ class TrinamicDriver(treedict.Tree_dict):
         if self.SPIrawlog:
             self.SPIrawlog.debug('SPI_XFER : ' + ':'.join("{:02x}".format(c) for c in ba) + ' returned ' + ':'.join("{:02x}".format(c) for c in bytesback))
         assert bblen==5
-        self.status=self.motordef['statusClass'](bytesback[0])
+        self['chipregs/SHORTSTAT'].loadByte(bytesback[0])
         if readback:
             prevrr.loadBytes(bytesback)
             resp[prevname]=prevrr.curval
@@ -294,7 +294,8 @@ class TrinamicDriver(treedict.Tree_dict):
         if self.SPIlog:
             clockns=time.perf_counter_ns()-cstart
             cpuratio=(time.process_time_ns()-cpustart)/clockns*100
-            self.SPIlog.log(self.loglvl,"Status: {stat:02x}, SPI timing: {clockus:6.1f}uS {cpu:4.1f}%CPU".format(stat=self.status, clockus=clockns/1000, cpu=cpuratio))
+            self.SPIlog.log(self.loglvl,"Status: {stat:s}, SPI timing: {clockus:6.1f}uS {cpu:4.1f}%CPU".format(stat=self['chipregs/SHORTSTAT'].curval,
+                    clockus=clockns/1000, cpu=cpuratio))
         return resp
 
     def close(self):
@@ -328,7 +329,11 @@ class triRegister(treedict.Tree_dict):
     """
     def __init__(self, addr, access, logacts=[], **kwargs):
         self.logacts=logacts
-        super().__init__(**kwargs)
+        try:
+            super().__init__(**kwargs)
+        except:
+            print('exception in reg setup', kwargs)
+            raise
         assert 0 <= int(addr) < 128
         self.addr=int(addr)
         self.rflags = regFlags.readable if 'R' in access else regFlags.NONE
@@ -457,6 +462,24 @@ class triSignedint(triInt):
             self.setVal(self.minval*2+bbval)
         else:
             self.setVal(bbval)
+
+class triByteFlags(treedict.Tree_dict):
+    """
+    a special version for the status byte returned on every spi transfer - makes it look like another register to the app
+    """
+    def __init__(self, flagClass, **kwargs):
+        self.flagClass=flagClass
+        self.curval=self.flagClass.NONE
+        super().__init__(**kwargs)
+
+    def loadByte(self, abyte):
+        self.curval=self.flagClass(abyte)
+
+    def testFlag(self, flagbits):
+        """
+        test for 1 or more bits set (all must be set to return true)
+        """
+        return self.curval & flagbits == flagbits
 
 class triFlags(triRegister):
     """

@@ -57,12 +57,26 @@ cd to the directory containing the 3 python files.
 
 start the pigpio daemon if it is not already running I use `sudo gpiod -c 256`
 
-At the moment the gpio pins are set in the chipdrive module around line 40. You may need to change these depending on how you wired the hardware.
+At the moment the gpio pins have defaults defined in the trinamicDriver module around line 36. These can be changed in the
+chipdrive module when it instantiates the class around line 133.
 
 run the app:
 
 `python3 motor2.py`
 
 Select the mode to use:
-`goto target: the chip drives the motor to reach the target  -  set a target posn before ppressing ACTION!
+
+`goto target`
+the chip drives the motor to reach the target  -  set a target posn before ppressing ACTION!
   
+`run forward`
+the chip drives the motor at constant speed forwards
+
+`run reverse`
+the chip drives the motor at constant speed in reverse
+
+select the speed to use:
+
+`max rpm`
+Runs at the maximum speed defined for the motor
+

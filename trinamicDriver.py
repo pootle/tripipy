@@ -20,12 +20,40 @@ class TrinamicDriver(treedict.Tree_dict):
     """
     This class supports various Trinamic chips with an SPI interface (such as the 5130 or 5160).
     
-    Methods are provided to read and write the chipset registers by name, using tables provided on setup. Control of the extra pins
+    Methods are provided to read and write the chipset registers by name, using data provided on setup. Control of the extra pins
     that enable the chip's output stage, control its clock and set the logic levels are integrated into the class.
     
-    The class maintains a dict of the last value written to all registers, if the register is not in the dict, it hasn't been written
-    since this instance was created.
+    The driver uses the hierarchic Tree_dict class to provide easy access the state of the chip as follows:
+    
+        The driver has a name, which allows multiple chips to be given individual names.
+        The driver has a child - 'chipregs' which contains info about all the registers for the chip. This allows inheriting classes
+                to define further children for their own purposes.
+        
+        'chipregs' is a plain Tree_dict container that in turn contains a child for each register (named as in the chip's datasheet).
+                There is an additional 'pseudo' register named 'SHORTSTAT' that contains the last read status byte from the chip
+                (see datasheet section 4.1). It allows the last read status to be accessed in the same way as full registers.
+                
+        This enables any register to be addressed as <motor name>/chipregs/<register name>.
+        
+        Various types of register are supported (full details in their class definitions below):
+            triHex: a register which is simply represented as an int with no understanding of it's meaning / structure
+            
+            triPosint / triSignedint: a register containing 1 integer. The classes understand the min / max values and 
+                correctly handle 2's compliment values.
+            
+            triMixed: a register that can contain a number of bit flags (defined using a subclass of Intflag) and 0 or more
+                multi-bit numeric fields that are numbers. The bit flags are defined by passing the IntFlag subclass as a parameter
+                to the constructor (or None if there aren't any). Numeric sub-fields are setup as children of the register using the
+                class triSubInt.
 
+    To allow batching of access (which reduces the bandwidth / increases the speed of access on the SPI interface, a read/write multiple
+    registers method is provided. The app can then issue a request to update multiple registers in a single call, and subsequently access
+    any read values through the register's class instance.
+    
+    Register access examples (from within an instance of TrinamicDriver):   # these examples use the reg defs for a tmc5130
+        self['chipregs/XACTUAL'].getCurrent()                               # the most recently read value of the XACTUAL register
+        self['chipregs/RAMPSTAT'].testFlags(tmc5130regs.rampflags.vmax_reached # True if vmax_reached set in register RAMPSTAT
+        
     Various levels of logging are available.
 
     It is written using a TMC5130, but hopefully keeping the specifics of that chip abstracted out.
@@ -105,7 +133,7 @@ class TrinamicDriver(treedict.Tree_dict):
         self.motordef=motordef
         regs=self.makeChild(_cclass=treedict.Tree_dict, name='chipregs')
         for rn, rdef in self.motordef['regNames'].items():
-            rc={'triPosint': triPosint, 'triSignedint': triSignedint, 'triFlags': triFlags, 'triHex': triHex, 'triByteFlags': triByteFlags}[rdef['rclass']]
+            rc=rdef['rclass']
             regs.makeChild(_cclass=rc, name=rn, **rdef['rargs'])
         regs['SHORTSTAT'].loadByte(0)
         if self.logger:
@@ -316,29 +344,39 @@ class TrinamicDriver(treedict.Tree_dict):
             self.logger.info("controller shut down")
 
 class regFlags(IntFlag):
+    """
+    flags associated with every register indicating if the register can be read and / or can be written. Used to check access.
+    """
     NONE        =0
     readable    =auto()
     writeable   =auto()
 
 class triRegister(treedict.Tree_dict):
     """
-    Registers inherit from queueob so we can easily address them from the motor level and can subdivide them for bit 
+    Every register uses an instance of (a derived version) of this class. This class records basic info about the register
+    and provides some common methods.
+    
+    Registers inherit from Tree_dict so we can easily address them from the motor level and can subdivide them for bit 
     fields. The actual value of the register is held at this level for full registers and for bit field registers.
     
-    The additional resolve functionality is used to enable batching of register updates (i.e. use readwriteMulitiple)
     """
     def __init__(self, addr, access, logacts=[], **kwargs):
-        self.logacts=logacts
-        try:
-            super().__init__(**kwargs)
-        except:
-            print('exception in reg setup', kwargs)
-            raise
+        """
+        sets up basic info on the register
+        
+        addr:   The address of the register
+        access: a string containing 'W' if register can be written to the chip and 'R' if the register can be read from the chip
+        """
         assert 0 <= int(addr) < 128
         self.addr=int(addr)
         self.rflags = regFlags.readable if 'R' in access else regFlags.NONE
         if 'W' in access:
             self.rflags |= regFlags.writeable
+        try:
+            super().__init__(**kwargs)
+        except:
+            print('exception in reg setup', kwargs)
+            raise
 
     def getCurrent(self):
         """
@@ -363,12 +401,22 @@ class triRegister(treedict.Tree_dict):
         """
         pass
 
+    def packBytes(self, ba, rawval):
+        if regFlags.writeable in self.rflags:
+            ba[0]=self.addr | 128
+            ba[1]=(rawval>>24) & 255
+            ba[2]=(rawval>>16) & 255
+            ba[3]=(rawval>>8) & 255
+            ba[4]=rawval & 255
+        else:
+            raise ValueError('register %s does not allow write' % self.name)
+
     def unpackBytes(self, ba):
         return ((ba[1]<<24) | (ba[2]<<16) | (ba[3]<<8) | ba[4])
 
 class triHex(triRegister):
     """
-    basic class where we just do it in hex
+    basic class where we just do it in hex. Used as a backstop for registers we don't care about yet.
     """
     def getCurrent(self):
         return self.curval
@@ -383,17 +431,10 @@ class triHex(triRegister):
         """
         fills the given 5 byte buffer with the bytes to write to the chip.
         """
-        if regFlags.writeable in self.rflags:
-            if not value is None:
-                self.setVal(value)
-            rval=self.getCurrent()
-            ba[0]=self.addr | 128
-            ba[1]=(rval>>24) & 255
-            ba[2]=(rval>>16) & 255
-            ba[3]=(rval>>8) & 255
-            ba[4]=rval & 255
-        else:
-            raise ValueError('register %s does not allow write' % self.name)
+        
+        if not value is None:
+            self.setVal(value)
+        self.packBytes(ba, self.getCurrent())
 
     def loadBytes(self, ba):
         """
@@ -419,17 +460,9 @@ class triInt(triHex):
         fills the given 5 byte buffer with the bytes to write to the chip. Note that the mask is applied to strip off
         high order bits in case the value is negative
         """
-        if regFlags.writeable in self.rflags:
-            if not value is None:
-                self.setVal(value)
-            rval=self.getCurrent() & self.mask
-            ba[0]=self.addr | 128
-            ba[1]=(rval>>24) & 255
-            ba[2]=(rval>>16) & 255
-            ba[3]=(rval>>8) & 255
-            ba[4]=rval & 255
-        else:
-            raise ValueError('register %s does not allow write' % self.name)
+        if not value is None:
+            self.setVal(value)
+        self.packBytes(ba, self.getCurrent() & self.mask)
 
 class triPosint(triInt):
     def __init__(self, sigbits, maxval=None, initialval=0, **kwargs):
@@ -481,24 +514,119 @@ class triByteFlags(treedict.Tree_dict):
         """
         return self.curval & flagbits == flagbits
 
-class triFlags(triRegister):
+class triEnum(triRegister):
     """
-    For registers entirely of bit flags, use an IntFlag
+    for registers where each value has a distinct meaning, use an enum to make code easier to understand
     """
-    def __init__(self, flagClass, **kwargs):
+    def __init__(self, enumClass, **kwargs):
+        self.enumClass=enumClass
         super().__init__(**kwargs)
-        self.flagClass=flagClass
-        self.setVal(0)
-        
+
+    def loadBytes(self, ba):
+        self.curval=self.enumClass(self.unpackBytes(ba))
+
+    def writeBytes(self, ba, value=None):
+        """
+        fills the given 5 byte buffer with the bytes to write to the chip.
+        """
+        if not value is None:
+            self.curval=value
+        self.packBytes(ba, self.curval.value)
+
     def getCurrent(self):
         return self.curval
 
-    def setVal(self, value):
-        self.curval=self.flagClass(value)
-    
-    def writeBytes(self, ba, value=None):
-        raise NotImplementedError()
+class triMixed(triRegister):
+    """
+    A class for registers that have a mix of 0 or more bit flags and 1 or more multi bit value fields.
+    The flags can be checked in the same way as for a triFlags register, the multi bit fields are 
+    children of this field that are checked dynamically. They need to be created separately after this
+    has been created. (see triSubReg below).
+    """
+    def __init__(self, flagClass=None, **kwargs):
+        if flagClass is None:
+            self.flagmask=None
+        else:
+            fall = flagClass(0)
+            for f in flagClass:
+                fall |= f
+            self.flagsmask=fall.value
+        self.curval=0
+        super().__init__(**kwargs)
+
+    def testFlags(self, flagbits):
+        """
+        test for 1 or more bits set (all must be set to return True)
+        """
+        assert not self.flagmask is None
+        return self.curval & flagbits == flagbits
+
+    def setFlags(self, flagbits, on):
+        """
+        sets 1 or more flagbits on or off.
+        
+        flagbits: 1 or more flagbits
+        
+        on: If True set flagbits, else clear them
+        """
+        assert not self.flagmask is None
+        if on:
+            self.curval |= flagbits
+        else:
+            self.curval &= ~flagbits
 
     def loadBytes(self, ba):
-        self.setVal(self.unpackBytes(ba))
-        
+        self.curval=self.unpackBytes(ba)
+
+    def writeBytes(self, ba, value=None):
+        """
+        fills the given 5 byte buffer with the bytes to write to the chip.
+        """
+        if not value is None:
+            raise ValueError('register %s cannot accept new value in writeBytes' % self.name)
+        self.packBytes(ba, self.curval)
+
+class triSubInt(treedict.Tree_dict):
+    """
+    a class for an integer that is a few bits somewhere in the register.
+    
+    Instances of this class must be created as children of a triMixed instance. The current value
+    is always that held in the parent
+    """
+    def __init__(self, lowbit, bitcount, **kwargs):
+        bitmask=2**bitcount-1
+        self.lowbit=lowbit
+        self.bitmask=bitmask << lowbit
+        super().__init__(**kwargs)
+
+    def getCurrent(self):
+        return (self.parent.curval & self.bitmask) >> self.lowbit
+
+    def set(self, value):
+        shv=value<<self.lowbit
+        assert shv & self.bitmask==shv
+        pv=self.parent.curval & ~self.bitmask
+        self.parent.curval = pv | shv
+
+class triSubEnum(treedict.Tree_dict):
+    """
+    a class for an enumeration that is a few bits somewhere in the register.
+    
+    The register field is effectively an int, but since each value has a unique meaning, this 
+    allows meaninful names to be used.
+    """
+    def __init__(self, lowbit, bitcount, enumClass, **kwargs):
+        bitmask=2**bitcount-1
+        self.lowbit=lowbit
+        self.bitmask=bitmask << lowbit
+        self.enumClass=enumClass
+        super().__init__(**kwargs)
+
+    def getCurrent(self):
+        return self.enumClass((self.parent.curval & self.bitmask) >> self.lowbit)
+
+    def set(self, value):
+        shv=value.value<<self.lowbit
+        assert shv & self.bitmask==shv
+        pv=self.parent.curval & ~self.bitmask
+        self.parent.curval = pv | shv

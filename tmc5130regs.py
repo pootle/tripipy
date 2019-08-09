@@ -5,7 +5,8 @@ This defines the registers accessible via SPI for a tmc5130
 This is based on the TMC5130A DATASHEET (Rev. 1.15 / 2018-JUL-11)
 """
 
-from enum import IntFlag
+from enum import Enum, IntFlag
+from trinamicDriver import triHex, triByteFlags, triSignedint, triPosint, triMixed, triSubInt, triEnum
 
 addr="addr"
 mode="mode"
@@ -30,10 +31,20 @@ class statusFlags(IntFlag):
     left_stop   = 64
     rightstop   =128
 
+class GSTATflags(IntFlag):
+    """
+    Flags in the GSTAT register
+    """
+    NONE        = 0
+    reset       = 1
+    drv_err     = 2
+    uv_cp       = 4
+
 class rampFlags(IntFlag):
     """
     the flag bits in the ramp status register 
     """
+    NONE                = 0
     limit_left          = 1
     limit_right         = 2
     latch_left          = 4
@@ -73,48 +84,95 @@ class GCONFflags(IntFlag):
     direct_mode         = 2**16
     test_mode           = 2**17
 
+class IOINflags(IntFlag):
+    NONE                = 0
+    REFL_STEP           = 1
+    REFR_DIR            = 2
+    ENCB_DCEN_CFG4      = 4
+    ENCA_DCIN_CFG5      = 8
+    DRV_ENN_CFG6        = 16
+    ENC_N_DCO           = 32
+    SD_MODE             = 64
+    SWCOMP_IN           = 128
+
+class RAMPmode(Enum):
+    POSITION        = 0
+    VELOCITY_FWD    = 1
+    VELOCITY_REV    = 2
+    VOLICITY_HOLD   = 3
+
+class SWMODEflags(IntFlag):
+    NONE            = 0
+    stop_l_enable   = 2**0
+    stop_r_enable   = 2**1
+    pol_stop_l      = 2**2
+    pol_stop_r      = 2**3
+    swap_lr         = 2**4
+    latch_l_active  = 2**5
+    latch_l_inactive= 2**6
+    latch_r_active  = 2**7
+    latch_r_inactive= 2**8
+    en_latch_encoder= 2**9
+    sg_stop         = 2**10
+    en_softstop     = 2**11
+
+class DRVSTATflags(IntFlag):
+    fsactive            = 2**15
+    stallGuard          = 2**24
+    ot                  = 2**25
+    otpw                = 2**26
+    s2ga                = 2**27
+    s2gb                = 2**28
+    ola                 = 2**29
+    olb                 = 2**30
+    stst                = 2**31
+
 _regset={
-    "SHORTSTAT":  {rclass: 'triByteFlags',  rargs: {'flagClass': statusFlags}},
-#    "GCONF":      {rclass: 'triHex',        rargs: {addr: 0x00, access: "RW", 'logacts': ('constructors', 'resolve', 'content')}},
-    "GCONF":      {rclass: 'triFlags',      rargs: {addr: 0x00, access: "RW", 'flagClass': rampFlags}}, 
-    "GSTAT":      {rclass: 'triHex',        rargs: {addr: 0x01, access: "R",  'logacts': ('constructors', 'resolve', 'content')}},
-    "IFCNT":      {rclass: 'triHex',        rargs: {addr: 0x02, access: "",   'logacts': ('constructors', 'resolve', 'content')}},
-    "SLAVECONF":  {rclass: 'triHex',        rargs: {addr: 0x03, access: "",   'logacts': ('constructors', 'resolve', 'content')}},
-    "INP_OUT":    {rclass: 'triHex',        rargs: {addr: 0x04, access: "R",  'logacts': ('constructors', 'resolve', 'content')}},
-    "X_COMPARE":  {rclass: 'triHex',        rargs: {addr: 0x05, access: "W",  'logacts': ('constructors', 'resolve', 'content')}},
+    "SHORTSTAT":  {rclass: triByteFlags,  rargs: {'flagClass': statusFlags}},
+    "GCONF":      {rclass: triMixed,      rargs: {addr: 0x00, access: "RW", 'flagClass': GCONFflags}}, 
+    "GSTAT":      {rclass: triMixed,      rargs: {addr: 0x01, access: "R",  'flagClass': GSTATflags}},
+    "IFCNT":      {rclass: triPosint,     rargs: {addr: 0x02, access: "R",  'sigbits': 8}}, # not used in SPI mode
+    "SLAVECONF":  {rclass: triHex,        rargs: {addr: 0x03, access: ""}},  # not used in SPI mode
+    "IOIN":       {rclass: triMixed,      rargs: {addr: 0x04, access: "R", 'flagClass': IOINflags, 'childdefs':(
+            {'_cclass': triSubInt, 'name': 'VERSION', 'lowbit':24, 'bitcount': 8},
+            )}},
+    "X_COMPARE":  {rclass: triSignedint,  rargs: {addr: 0x05, access: "RW"  ,sigbits: 32}},
 
-    "IHOLD_IRUN": {rclass: 'triHex',        rargs: {addr: 0x10, access: "W",  'logacts': ('constructors', 'resolve', 'content')}},
-    "TPOWERDOWN": {rclass: 'triHex',        rargs: {addr: 0x11, access: "W",  'logacts': ('constructors', 'resolve', 'content')}},
-    "TSTEP":      {rclass: 'triHex',        rargs: {addr: 0x12, access: "R",  'logacts': ('constructors', 'resolve', 'content')}},
-    "TPWMTHRS":   {rclass: 'triHex',        rargs: {addr: 0x13, access: "W",  'logacts': ('constructors', 'resolve', 'content')}},
-    "TCOOLTHRS":  {rclass: 'triHex',        rargs: {addr: 0x14, access: "W",  'logacts': ('constructors', 'resolve', 'content')}},
-    "THIGH":      {rclass: 'triHex',        rargs: {addr: 0x15, access: "W",  'logacts': ('constructors', 'resolve', 'content')}},
+    "IHOLD_IRUN": {rclass: triMixed,      rargs: {addr: 0x10, access: "W", 'childdefs':(
+            {'_cclass': triSubInt, 'name': 'IHOLD',      'lowbit': 0, 'bitcount': 5},
+            {'_cclass': triSubInt, 'name': 'IRUN',       'lowbit': 8, 'bitcount': 5},
+            {'_cclass': triSubInt, 'name': 'IHOLDDELAY', 'lowbit':16, 'bitcount': 4},
+            )}},
+    "TPOWERDOWN": {rclass: triPosint,     rargs: {addr: 0x11, access: "W",  sigbits: 8}},
+    "TSTEP":      {rclass: triPosint,     rargs: {addr: 0x12, access: "R",  sigbits: 20}},
+    "TPWMTHRS":   {rclass: triPosint,     rargs: {addr: 0x13, access: "W",  sigbits: 20}},
+    "TCOOLTHRS":  {rclass: triPosint,     rargs: {addr: 0x14, access: "W",  sigbits: 20}},
+    "THIGH":      {rclass: triPosint,     rargs: {addr: 0x15, access: "W",  sigbits: 20}},
 
-    "RAMPMODE":   {rclass: 'triHex',        rargs: {addr: 0x20, access: "RW", 'logacts': ('constructors', 'resolve', 'content')}},
-    "XACTUAL":    {rclass: 'triSignedint',  rargs: {addr: 0x21, access: "RW"  ,sigbits: 32, 'logacts': ('constructors', 'resolve', 'content')}},
-    "VACTUAL":    {rclass: 'triSignedint',  rargs: {addr: 0x22, access: "RW",  sigbits: 24, 'logacts': ('constructors', 'resolve', 'content')}},
-    "VSTART":     {rclass: 'triPosint',     rargs: {addr: 0x23, access: "W",   sigbits: 18, 'logacts': ('constructors', 'resolve', 'content')}},
-    "A1":         {rclass: 'triPosint',     rargs: {addr: 0x24, access: "W",   sigbits: 16, 'logacts': ('constructors', 'resolve', 'content')}},
-    "V1":         {rclass: 'triPosint',     rargs: {addr: 0x25, access: "W", sigbits: 20, 'logacts': ('constructors', 'resolve', 'content')}},
-    "AMAX":       {rclass: 'triPosint',     rargs: {addr: 0x26, access: "W", sigbits: 16, 'logacts': ('constructors', 'resolve', 'content')}},
-    "VMAX":       {rclass: 'triPosint',     rargs: {addr: 0x27, access: "W", sigbits: 23, maxval: 2**23-512, 'logacts': ('constructors', 'resolve', 'content')}},
-    "DMAX":       {rclass: 'triPosint',     rargs: {addr: 0x28, access: "W", sigbits: 16, 'logacts': ('constructors', 'resolve', 'content')}},
-    "D1":         {rclass: 'triPosint',     rargs: {addr: 0x2A, access: "W", sigbits: 16, 'logacts': ('constructors', 'resolve', 'content')}},
-    "VSTOP":      {rclass: 'triPosint',     rargs: {addr: 0x2B, access: "W", sigbits: 18, 'logacts': ('constructors', 'resolve', 'content')}},
-    "TZEROWAIT":  {rclass: 'triPosint',     rargs: {addr: 0x2C, access: "W", sigbits: 16, 'logacts': ('constructors', 'resolve', 'content')}},
-    "XTARGET":    {rclass: 'triSignedint',  rargs: {addr: 0x2D, access: "RW", sigbits: 32, 'logacts': ('constructors', 'resolve', 'content')}},
+    "RAMPMODE":   {rclass: triEnum,       rargs: {addr: 0x20, access: "RW", 'enumClass': RAMPmode}},
+    "XACTUAL":    {rclass: triSignedint,  rargs: {addr: 0x21, access: "RW", sigbits: 32}},
+    "VACTUAL":    {rclass: triSignedint,  rargs: {addr: 0x22, access: "RW", sigbits: 24}},
+    "VSTART":     {rclass: triPosint,     rargs: {addr: 0x23, access: "W",  sigbits: 18}},
+    "A1":         {rclass: triPosint,     rargs: {addr: 0x24, access: "W",  sigbits: 16}},
+    "V1":         {rclass: triPosint,     rargs: {addr: 0x25, access: "W",  sigbits: 20}},
+    "AMAX":       {rclass: triPosint,     rargs: {addr: 0x26, access: "W",  sigbits: 16}},
+    "VMAX":       {rclass: triPosint,     rargs: {addr: 0x27, access: "W",  sigbits: 23, maxval: 2**23-512}},
+    "DMAX":       {rclass: triPosint,     rargs: {addr: 0x28, access: "W",  sigbits: 16}},
+    "D1":         {rclass: triPosint,     rargs: {addr: 0x2A, access: "W",  sigbits: 16}},
+    "VSTOP":      {rclass: triPosint,     rargs: {addr: 0x2B, access: "W",  sigbits: 18}},
+    "TZEROWAIT":  {rclass: triPosint,     rargs: {addr: 0x2C, access: "W",  sigbits: 16}},
+    "XTARGET":    {rclass: triSignedint,  rargs: {addr: 0x2D, access: "RW", sigbits: 32}},
 
-    "VDCMIN":     {rclass: 'triHex',        rargs: {addr: 0x33, access: "W",  'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x33, mode:"W"},
-    "SWMODE":     {rclass: 'triHex',        rargs: {addr: 0x34, access: "RW", 'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x34, mode:"RW"},
-#    "RAMPSTAT":   {addr: 0x35, mode:"RC"},
-    'RAMPSTAT':   {rclass: 'triFlags',      rargs: {addr: 0x35, access: "R",  'flagClass': rampFlags}},
-    "XLATCH":     {rclass: 'triHex',        rargs: {addr: 0x36, access: "R",  'logacts': ('constructors', 'resolve', 'content')}},# {addr: 0x36, mode:"R"},
+    "VDCMIN":     {rclass: triPosint,     rargs: {addr: 0x33, access: "W",  sigbits:23}},
+    "SWMODE":     {rclass: triMixed,      rargs: {addr: 0x34, access: "RW", 'flagClass': SWMODEflags}},
+    'RAMPSTAT':   {rclass: triMixed,      rargs: {addr: 0x35, access: "R",  'flagClass': rampFlags}},
+    "XLATCH":     {rclass: triSignedint,  rargs: {addr: 0x36, access: "R",  sigbits: 32}},
 
-    "ENCMODE":    {rclass: 'triHex',        rargs: {addr: 0x38, access: "RW", 'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x38, mode:"RW"},
-    "XENC":       {rclass: 'triHex',        rargs: {addr: 0x39, access: "RW", 'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x39, mode:"RW"},
-    "ENC_CONST":  {rclass: 'triHex',        rargs: {addr: 0x3A, access: "W",  'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x3A, mode:"W"},
-    "ENC_STATUS": {rclass: 'triHex',        rargs: {addr: 0x3B, access: "R",  'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x3B, mode:"RC"},
-    "ENC_LATCH":  {rclass: 'triHex',        rargs: {addr: 0x3C, access: "R",  'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x3C, mode:"R"},
+    "ENCMODE":    {rclass: triHex,        rargs: {addr: 0x38, access: "RW"}},
+    "XENC":       {rclass: triHex,        rargs: {addr: 0x39, access: "RW"}},
+    "ENC_CONST":  {rclass: triHex,        rargs: {addr: 0x3A, access: "W"}},
+    "ENC_STATUS": {rclass: triHex,        rargs: {addr: 0x3B, access: "R"}},
+    "ENC_LATCH":  {rclass: triHex,        rargs: {addr: 0x3C, access: "R"}},
 
 #    "MSLUT0":     {addr: 0x60, mode:"W"},
 #    "MSLUT1":     {addr: 0x61, mode:"W"},
@@ -129,41 +187,24 @@ _regset={
 #    "MSCNT":      {addr: 0x6A, mode:"R"},
 #    "MSCURACT":   {addr: 0x6B, mode:"R"},
 
-    "CHOPCONF":   {rclass: 'triHex',        rargs: {addr: 0x6C, access: "RW", 'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x6C, mode:"RW"},
-    "COOLCONF":   {rclass: 'triHex',        rargs: {addr: 0x6D, access: "W",  'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x6D, mode:"W"},
-    "DCCTRL":     {rclass: 'triHex',        rargs: {addr: 0x6E, access: "W",  'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x6E, mode:"W"},
-    "DRVSTATUS":  {rclass: 'triHex',        rargs: {addr: 0x6F, access: "R",  'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x6F, mode:"R"},
-    "PWMCONF":    {rclass: 'triHex',        rargs: {addr: 0x70, access: "W",  'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x70, mode:"W"},
-    "PWMSCALE":   {rclass: 'triHex',        rargs: {addr: 0x71, access: "R",  'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x71, mode:"R"},
-    "ENCM_CTRL":  {rclass: 'triHex',        rargs: {addr: 0x72, access: "W",  'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x72, mode:"W"},
-    "LOST_STEPS": {rclass: 'triHex',        rargs: {addr: 0x73, access: "R",  'logacts': ('constructors', 'resolve', 'content')}},#{addr: 0x73, mode:"R"},
+    "CHOPCONF":   {rclass: triHex,        rargs: {addr: 0x6C, access: "RW"}},
+    "COOLCONF":   {rclass: triHex,        rargs: {addr: 0x6D, access: "W"}},
+    "DCCTRL":     {rclass: triHex,        rargs: {addr: 0x6E, access: "W"}},
+    "DRVSTATUS":  {rclass: triMixed,      rargs: {addr: 0x6F, access: "R", 'flagClass': DRVSTATflags, 'childdefs':(
+            {'_cclass': triSubInt, 'name': 'SG_RESULT', 'lowbit':0, 'bitcount': 10},
+            {'_cclass': triSubInt, 'name': 'CS_ACTUAL', 'lowbit':16, 'bitcount':5},
+            )}},
+    "PWMCONF":    {rclass: triHex,        rargs: {addr: 0x70, access: "W"}},
+    "PWMSCALE":   {rclass: triHex,        rargs: {addr: 0x71, access: "R"}},
+    "ENCM_CTRL":  {rclass: triHex,        rargs: {addr: 0x72, access: "W"}},
+    "LOST_STEPS": {rclass: triHex,        rargs: {addr: 0x73, access: "R"}},
 }
 
 tmc5130={
     'regNames'     : _regset,
 #    'statusClass'  : statusFlags,
 }
-"""	stuff that might be useful later
-    // ramp modes (Register TMC5130_RAMPMODE)
-    "TMC5130_MODE_POSITION  0
-    "TMC5130_MODE_VELPOS    1
-    "TMC5130_MODE_VELNEG    2
-    "TMC5130_MODE_HOLD      3
-
-	// limit switch mode bits (Register TMC5130_SWMODE)
-    "TMC5130_SW_STOPL_ENABLE    0x0001
-    "TMC5130_SW_STOPR_ENABLE    0x0002
-    "TMC5130_SW STOPL_POLARITY  0x0004
-    "TMC5130_SW_STOPR_POLARITY  0x0008
-    "TMC5130_SW_SWAP_LR         0x0010
-    "TMC5130_SW_LATCH_L_ACT     0x0020
-    "TMC5130_SW_LATCH_L_INACT   0x0040
-    "TMC5130_SW_LATCH_R_ACT     0x0080
-    "TMC5130_SW_LATCH_R_INACT   0x0100
-    "TMC5130_SW_LATCH_ENC       0x0200
-    "TMC5130_SW_SG_STOP         0x0400
-    "TMC5130_SW_SOFTSTOP        0x0800
-
+"""
 	//Encoderbits (Register TMC5130_ENCMODE)
     "TMC5130_EM_DECIMAL     0x0400
     "TMC5130_EM_LATCH_XACT  0x0200

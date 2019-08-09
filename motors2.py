@@ -171,6 +171,7 @@ motorfields=(
     ('XTARGET',  gz.Text, {'text': 'XTARGET:',   'align': 'right'}, Ffield,      {'motorfield': 'chipregs/XTARGET', 'format': '{:7d}', 'align': 'left'}),
     ('currpm',   gz.Text, {'text': 'current rpm:','align':'right'}, Ffield,      {'motorfield': 'settings/rpmnow', 'format': '{:5.2f}', 'align': 'left'}),
     ('VACTUAL',  gz.Text, {'text': 'VACTUAL',    'align': 'right'}, Ffield,      {'motorfield': 'chipregs/VACTUAL', 'format': '{:7d}', 'align': 'left'}),
+    ('loadtemp', gz.Text, {'text': 'load / temp:','align':'right'}, Ffield,      {'motorfield': 'chipregs/DRVSTATUS/SG_RESULT', 'format': '{:5d}', 'align':'left'}),
     ('maxrpm',   gz.Text, {'text': 'max rpm:',   'align': 'right'}, Ffield,      {'motorfield': 'settings/maxrpm', 'format': '{:5.2f}'}),
     ('startrpm', gz.Text, {'text': 'start rpm:', 'align': 'right'}, CalcField,   {'motorfield': 'chipregs/VSTART', 'format': '{:5.2f}'}),
     ('VMAX',     gz.Text, {'text': 'VMAX:',      'align': 'right'}, Ffield,      {'motorfield': 'chipregs/VMAX', 'format': '{:d}'}),
@@ -188,9 +189,10 @@ class motorPanel():
         for k,v in pfields.items():
             if not v['class'] is None:
                 self.mfields[k]=v['class'](mpanel=self, grid=[gridx,v['y']], **v['kwargs'])
+        print('chip version is %d' % self.motor['chipregs/IOIN/VERSION'].getCurrent())
 
     def ticker(self):
-        reads={'VACTUAL':0, 'XACTUAL':0, 'XTARGET':0, 'VACTUAL': 0, 'GSTAT':0}
+        reads={'VACTUAL':0, 'XACTUAL':0, 'XTARGET':0, 'VACTUAL': 0, 'GSTAT':0, 'DRVSTATUS':0}
         self.motor.readWriteMultiple(reads, 'R')
         self.mfields['XACTUAL'].update()
         self.mfields['posn'].update()
@@ -200,6 +202,7 @@ class motorPanel():
         self.mfields['VMAX'].update()
         self.mfields['stat_atpos'].update()
         self.mfields['stat_atmax'].update()
+        self.mfields['loadtemp'].update()
 
     def close(self):
         self.motor.close()

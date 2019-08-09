@@ -133,13 +133,16 @@ class tmc5130(trinamicDriver.TrinamicDriver):
         super().__init__(name='fred', parent=None, app=None, clockfrequ=self.clockfrequ, datarate=1000000, pigp=self.pg,
                 motordef=tmc5130regs.tmc5130, drvenpin=12, spiChannel=1, loglvl=loglvl )
         self.makeChild(_cclass=treedict.Tree_dict, name='settings', childdefs=settings)
-#        self.maxV=round(self.RPMtoVREG(self['settings/maxrpm'].getCurrent()))
+        self['chipregs/IHOLD_IRUN/IHOLD'].set(10)
+        self['chipregs/IHOLD_IRUN/IRUN'].set(15)
+        self['chipregs/IHOLD_IRUN/IHOLDDELAY'].set(8)
         regsettings=OrderedDict((   # base set of register values to get started
-                ('GSTAT',0),
-                ('GCONF', tmc5130regs.GCONFflags.en_pwm_mode),
+                ('GSTAT',0),                                    # reads current and clears latching flags
+                ('IOIN', 0),                                    # gets the chip's version number
+                ('GCONF', tmc5130regs.GCONFflags.en_pwm_mode),  # sets stealth chop mode
                 ('CHOPCONF', 0x000100C3),
-                ('IHOLD_IRUN', 0x00080F0A),
-                ('TPOWERDOWN', 0x0000000A),
+                ('IHOLD_IRUN', None),                           # already setup above
+                ('TPOWERDOWN', 10),
                 ('TPWMTHRS', 0x000001F4),
                 ('VSTART', 30),
                 ('A1', 1500),
@@ -149,9 +152,8 @@ class tmc5130(trinamicDriver.TrinamicDriver):
                 ('DMAX', 1100),
                 ('D1', 600),
                 ('VSTOP', 40),
-                ('RAMPMODE',0)
                  ))
-        regactions='RUWWWWWWWWWWWWW'
+        regactions='RRUWWWWWWWWWWWW'
         assert len(regsettings)==len(regactions)
         self.readWriteMultiple(regsettings,regactions)
 
@@ -194,7 +196,7 @@ class tmc5130(trinamicDriver.TrinamicDriver):
 
     def wait_reached(self, ticktime=.5):
         time.sleep(ticktime)
-        reads={'VACTUAL':0, 'XACTUAL':0, 'XTARGET':0, 'GSTAT':0, 'RAMPSTAT':0}
+        reads={'VACTUAL':0, 'XACTUAL':0, 'XTARGET':0, 'RAMPSTAT':0}
         self.readWriteMultiple(reads, 'R')
         while not motorStatus.at_position in self['chipregs/SHORTSTAT'].curval:
             print('loc    {location:9.2f}   chipVelocity  {velocity:9.2f}'.format(location=reads['XACTUAL']/self['settings/uStepsPerRev'].getCurrent(), velocity=reads['VACTUAL']))
@@ -214,7 +216,7 @@ class tmc5130(trinamicDriver.TrinamicDriver):
         regupdates=OrderedDict((
             ('VMAX', round(self.RPMtoVREG(self['settings/maxrpm'].getCurrent() if speed is None else speed))),
             ('XTARGET', round(self['settings/uStepsPerRev'].getCurrent()*targetpos)),
-            ('RAMPMODE',0),
+            ('RAMPMODE', tmc5130regs.RAMPmode.POSITION),
              ))
         self.enableOutput(True)
         self.readWriteMultiple(regupdates,'W')
@@ -226,7 +228,7 @@ class tmc5130(trinamicDriver.TrinamicDriver):
     def setspeed(self, speed):
         regupdates=OrderedDict((
             ('VMAX', round(self.RPMtoVREG(abs(speed)))),
-            ('RAMPMODE',1 if speed >=0 else 2),
+            ('RAMPMODE', tmc5130regs.RAMPmode.VELOCITY_FWD if speed >=0 else tmc5130regs.RAMPmode.VELOCITY_REV),
             ))
         self.enableOutput(True)
         self.readWriteMultiple(regupdates,'W')
@@ -234,7 +236,7 @@ class tmc5130(trinamicDriver.TrinamicDriver):
     def stop(self):
         self.writeInt('XTARGET', self.readInt('XACTUAL'))
         self.writeInt('VMAX', round(self.RPMtoVREG(self['settings/maxrpm'].getCurrent())))
-        self.writeInt('RAMPMODE',0)
+        self.writeInt('RAMPMODE', tmc5130regs.RAMPmode.POSITION)
         self.waitStop(ticktime=.1)
         self.enableOutput(False)
 

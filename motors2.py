@@ -51,6 +51,18 @@ class Ffield(Ftext):
     def update(self):
         self.value=self.makeString()
 
+class TimeField(Ffield):
+    """
+    Simple variant of Ffield that formats to hours, minutes and seconds
+    """
+    def makeString(self):
+        v=self.getValue()       # v is a float, value in minutes and fractions of a minute
+        mint = int(v)
+        secs = round((v % 1) * 60)
+        mins = mint % 60
+        hours= int(mins / 60)
+        return self.format.format(hours=hours, mins=mins, secs=secs)
+
 class BitField(Ftext):
     """
     The displayed value is a single bitFlag
@@ -96,12 +108,12 @@ class EdText(gz.TextBox):
         """
         print('I have value %s' % self.value)
 
-class EdInt(EdText):
-    """
-    EdText specialised to accept integer values
-    """
-    def __init__(self, minval, maxval, **kwargs):
-        pass
+#class EdInt(EdText):
+#    """
+#    EdText specialised to accept integer values
+#    """
+#    def __init__(self, minval, maxval, **kwargs):
+#        pass
 
 class EdFloat(EdText):
     """
@@ -166,7 +178,7 @@ motorfields=(
     ('action',   gz.Text, {'text': 'do it NOW!', 'align': 'right'}, Button,      {'text': 'ACTION!', 'command': '../actionButton'}),
     ('stat_atpos',gz.Text,{'text': 'at posn'},                      BitField,    {'motorfield': 'chipregs/SHORTSTAT', 'flagbit': tmc5130regs.statusFlags.at_position,}),
     ('stat_atmax',gz.Text,{'text': 'at max rpm'},                   BitField,    {'motorfield': 'chipregs/SHORTSTAT', 'flagbit': tmc5130regs.statusFlags.at_VMAX,}),
-    ('posn',     gz.Text, {'text': 'current posn:','align': 'right'}, Ffield,    {'motorfield':'settings/posn', 'format': '{:5.2f}', 'align':'left'}),
+    ('posn',     gz.Text, {'text': 'time:',      'align': 'right'}, TimeField,   {'motorfield':'settings/posn', 'format': '{hours:02d}:{mins:02d}:{secs:02d}', 'align':'left'}),
     ('XACTUAL',  gz.Text, {'text': 'XACTUAL:',   'align': 'right'}, Ffield,      {'motorfield': 'chipregs/XACTUAL', 'format': '{:7d}', 'align': 'left'}),
     ('XTARGET',  gz.Text, {'text': 'XTARGET:',   'align': 'right'}, Ffield,      {'motorfield': 'chipregs/XTARGET', 'format': '{:7d}', 'align': 'left'}),
     ('currpm',   gz.Text, {'text': 'current rpm:','align':'right'}, Ffield,      {'motorfield': 'settings/rpmnow', 'format': '{:5.2f}', 'align': 'left'}),
@@ -193,16 +205,10 @@ class motorPanel():
 
     def ticker(self):
         reads={'VACTUAL':0, 'XACTUAL':0, 'XTARGET':0, 'VACTUAL': 0, 'GSTAT':0, 'DRVSTATUS':0}
+        # first get the driver registers up to date
         self.motor.readWriteMultiple(reads, 'R')
-        self.mfields['XACTUAL'].update()
-        self.mfields['posn'].update()
-        self.mfields['VACTUAL'].update()
-        self.mfields['currpm'].update()
-        self.mfields['XTARGET'].update()
-        self.mfields['VMAX'].update()
-        self.mfields['stat_atpos'].update()
-        self.mfields['stat_atmax'].update()
-        self.mfields['loadtemp'].update()
+        for f in ('XACTUAL', 'posn', 'VACTUAL', 'currpm', 'XTARGET', 'VMAX', 'stat_atpos', 'stat_atmax', 'loadtemp'):
+            self.mfields[f].update()
 
     def close(self):
         self.motor.close()

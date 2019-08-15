@@ -186,19 +186,21 @@ class TrinamicDriver(treedict.Tree_dict):
         elif self.logger:
             self.logger.warning("output driver (dis)enable requested but pigpio not availalble")
 
-    def writeInt(self, regName, regValue):
+    def writeInt(self, regName, regValue=None):
         """
         Writes immediately to a single register in the Trinamic chip
         
         regName: Either the name of a register present in  self['chipregs']
         
         regValue: a value interpreted as a simple 32 bit integer that will be written to the chip.
+                  Note: if this is None writeBytes picks the current value saved in the instance
         """
         if self.SPIlog:
             cstart=time.perf_counter_ns()
             cpustart=time.process_time_ns()
         ba=[0]*5
-        self['chipregs/'+regName].writeBytes(ba, value=regValue)
+        creg=self['chipregs/'+regName]
+        creg.writeBytes(ba, value=regValue)
         self.pigp.spi_write(self.spidev, ba)
         if self.SPIrawlog:
             self.SPIrawlog.debug('SPI_WRITE: ' + ':'.join("{:02x}".format(c) for c in ba))
@@ -206,7 +208,7 @@ class TrinamicDriver(treedict.Tree_dict):
             clockns=time.perf_counter_ns()-cstart
             cpuratio=(time.process_time_ns()-cpustart)/clockns*100
             self.SPIlog.debug("WRITE" + " {regname:10s}: {regval:9d} ({regval:08x}) {clockus:6.1f}uS {cpu:4.1f}%CPU".format(
-                    regname=str(regName), regval=regValue, clockus=clockns/1000, cpu=cpuratio,))
+                    regname=str(regName), regval=creg.getCurrent(), clockus=clockns/1000, cpu=cpuratio,))
 
     def readInt(self, regName):
         """
@@ -543,37 +545,41 @@ class triMixed(triRegister):
     children of this field that are checked dynamically. They need to be created separately after this
     has been created. (see triSubReg below).
     """
-    def __init__(self, flagClass=None, **kwargs):
+    def __init__(self, name, flagClass=None, **kwargs):
         if flagClass is None:
             self.flagmask=None
         else:
             fall = flagClass(0)
             for f in flagClass:
                 fall |= f
-            self.flagsmask=fall.value
+            self.flagmask=fall.value
+        self.flagClass=flagClass
         self.curval=0
-        super().__init__(**kwargs)
+        super().__init__(name=name, **kwargs)
 
     def testFlags(self, flagbits):
         """
         test for 1 or more bits set (all must be set to return True)
         """
         assert not self.flagmask is None
-        return self.curval & flagbits == flagbits
+        return self.curval & flagbits.value == flagbits.value
 
-    def setFlags(self, flagbits, on):
+    def setFlag(self, flag, on):
         """
-        sets 1 or more flagbits on or off.
+        sets 1 flagbit on or off.
         
-        flagbits: 1 or more flagbits
+        flag: flag to set
         
-        on: If True set flagbits, else clear them
+        on: If True set flag, else clear them
         """
         assert not self.flagmask is None
+        flags=self.flagClass(self.curval & self.flagmask)
         if on:
-            self.curval |= flagbits
-        else:
-            self.curval &= ~flagbits
+            flags |= flag
+        elif flag in flags:
+            flags ^= flag
+        zap=self.curval & ~self.flagmask
+        self.curval = zap | flags.value
 
     def loadBytes(self, ba):
         self.curval=self.unpackBytes(ba)

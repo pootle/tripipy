@@ -94,6 +94,20 @@ class CalcField(Ffield):
     def getValue(self):
         return self.converter(super().getValue())
 
+class CheckBox(gz.CheckBox):
+    """
+    checkbox...
+    """
+    def __init__(self, mpanel, command=None, **kwargs):
+        if command is None:
+            cmd=None
+        elif command.startswith('../'):
+            cmd=getattr(mpanel, command[3:])
+        else:
+            cmd=getattr(self, command)
+        assert cmd is None or callable(cmd)
+        super().__init__(master=mpanel.panel, command=cmd, text='', **kwargs)
+
 class EdText(gz.TextBox):
     """
     basic user editable field
@@ -172,10 +186,11 @@ The last 2 are used by the motor class to setup its values for each field
 motorfields=(
     ('motor',    gz.Text, {'text': 'motor:',     'align': 'right'}, FmotorName,  {}),
     ('runtype',  gz.Text, {'text': 'run type:',  'align': 'right'}, EdChoice,    {'options': ['goto target', 'run forward', 'run reverse']}),
-    ('speed',    gz.Text, {'text': 'speed:',     'align': 'right'}, EdChoice,    {'options': ['max rpm', 'real time', 'reverse time', 'double speed', 'target']}),
+    ('speed',    gz.Text, {'text': 'speed:',     'align': 'right'}, EdChoice,    {'options': ['max rpm', 'real time', 'double speed', 'sidereal time', 'target']}),
     ('userpm',   gz.Text, {'text': 'target rpm:','align': 'right'}, EdFloat,     {'minval': -100000, 'maxval': 1000000, 'align': 'left'}),
     ('targetpos',gz.Text, {'text': 'target posn:','align': 'right'}, EdFloat,    {'minval':None, 'maxval': None, 'align': 'left'}),
     ('action',   gz.Text, {'text': 'do it NOW!', 'align': 'right'}, Button,      {'text': 'ACTION!', 'command': '../actionButton'}),
+    ('reversed', gz.Text, {'text': 'swap direction:','align':'right'},CheckBox,  {'command': '../flipdir'}),
     ('stat_atpos',gz.Text,{'text': 'at posn'},                      BitField,    {'motorfield': 'chipregs/SHORTSTAT', 'flagbit': tmc5130regs.statusFlags.at_position,}),
     ('stat_atmax',gz.Text,{'text': 'at max rpm'},                   BitField,    {'motorfield': 'chipregs/SHORTSTAT', 'flagbit': tmc5130regs.statusFlags.at_VMAX,}),
     ('posn',     gz.Text, {'text': 'time:',      'align': 'right'}, TimeField,   {'motorfield':'settings/posn', 'format': '{hours:02d}:{mins:02d}:{secs:02d}', 'align':'left'}),
@@ -213,6 +228,11 @@ class motorPanel():
     def close(self):
         self.motor.close()
 
+    def flipdir(self):
+        dir=self.mfields['reversed'].value==1
+        self.motor['chipregs/GCONF'].setFlag(tmc5130regs.GCONFflags.shaft,dir)
+        self.motor.writeInt('GCONF')
+
     def actionButton(self):
         rtype=self.mfields['runtype'].value
         rspeed=self.mfields['speed'].value
@@ -220,15 +240,14 @@ class motorPanel():
             speed=self.mfields['maxrpm'].getValue()
         elif rspeed=='real time':
             speed=1
-        elif rspeed=='reverse time':
-            speed=1
         elif rspeed=='double speed':
             speed=2
+        elif rspeed=='sidereal time':
+            speed=86164.1/86400
         elif rspeed=='target':
             speed=self.mfields['userpm'].getValue()      
         else:
             raise ValueError("speed oops " + rspeed)
-
         if rtype=='goto target':
             posn=self.mfields['targetpos'].getValue()
             print('doit', rtype, posn, speed)
@@ -237,7 +256,6 @@ class motorPanel():
             self.motor.setspeed(speed=speed if rtype=='run forward' else -speed)
         else:
             raise ValueError('rtype oops '+ rtype)
-
 
 app = gz.App(title="Motor testing")
 starttime=time.time()

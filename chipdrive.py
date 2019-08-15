@@ -230,6 +230,7 @@ class tmc5130(trinamicDriver.TrinamicDriver):
             ('VMAX', round(self.RPMtoVREG(abs(speed)))),
             ('RAMPMODE', tmc5130regs.RAMPmode.VELOCITY_FWD if speed >=0 else tmc5130regs.RAMPmode.VELOCITY_REV),
             ))
+        print('rampmode requested: %s' % (regupdates['RAMPMODE']))
         self.enableOutput(True)
         self.readWriteMultiple(regupdates,'W')
 

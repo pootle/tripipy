@@ -235,10 +235,30 @@ class tmc5130(trinamicDriver.TrinamicDriver):
         self.readWriteMultiple(regupdates,'W')
 
     def stop(self):
-        self.writeInt('XTARGET', self.readInt('XACTUAL'))
-        self.writeInt('VMAX', round(self.RPMtoVREG(self['settings/maxrpm'].getCurrent())))
+        """
+        Terminates motion using a soft stop. Waits for ramp down to complete.
+
+        Driver will switch to positioning mode, and use AMAX and A1 for going to zero velocity.  VSTOP is not used in
+        this case. See 'Early Ramp Termination' in datasheet.
+        """
+
+        # Switch to positioning mode
         self.writeInt('RAMPMODE', tmc5130regs.RAMPmode.POSITION)
+
+        # Set VMAX and VSTART to 0.  Copy values before overwriting.
+        vstart = self['chipregs/VSTART'].curval
+        vmax = self['chipregs/VMAX'].curval
+        self.writeInt('VSTART', 0)
+        self.writeInt('VMAX', 0)
+
+        # Wait for motor to stop
         self.waitStop(ticktime=.1)
+
+        # Clear positioning moves and restore VMAX and VSTART
+        self.writeInt('XTARGET', self.readInt('XACTUAL'))
+        self.writeInt('VSTART', vstart)
+        self.writeInt('VMAX', vmax)
+
         self.enableOutput(False)
 
     def close(self):

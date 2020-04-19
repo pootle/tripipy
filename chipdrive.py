@@ -261,8 +261,52 @@ class tmc5130(trinamicDriver.TrinamicDriver):
 
         self.enableOutput(False)
 
+    def hard_stop(self):
+        """
+        Terminates motion using a hard stop.  Waits for motor to halt.
+
+        This is performed by:
+        - configuring the driver to automatically perform a hard stop when the reference switches are triggered
+        - simulating the activation of left and right reference switches
+
+        See 'Early Ramp Termination, Option D' in datasheet.
+
+        NOTE: In order for this to work, the REFL_STEP and REFL_RIGHT signals cannot be floating.  They must be tied
+        to a fixed level.  The active polarity of REFL_STEP and REFL_RIGHT must also be set properly in the SW_MODE
+        register according to their fixed level.  By default, they are active high.
+
+        WARNING: Avoid using hard stop at high velocities as it could result in severe overcurrent.
+        """
+
+        # Copy latest SW_MODE flags before modifying
+        sw_mode = self.readInt('SWMODE')
+
+        # Enable hard stop and automatic motor stop when right/left switches are active
+        self['chipregs/SWMODE'].setFlag(tmc5130regs.SWMODEflags.en_softstop, False)
+        self['chipregs/SWMODE'].setFlag(tmc5130regs.SWMODEflags.stop_l_enable, True)
+        self['chipregs/SWMODE'].setFlag(tmc5130regs.SWMODEflags.stop_r_enable, True)
+
+        # Invert active polarity of right/left switches to simulate them being triggered
+        self['chipregs/SWMODE'].toggleFlag(tmc5130regs.SWMODEflags.pol_stop_l)
+        self['chipregs/SWMODE'].toggleFlag(tmc5130regs.SWMODEflags.pol_stop_r)
+
+        # Execute hard stop and wait
+        self.writeInt('SWMODE', None)
+        self.waitStop(ticktime=.1)
+
+        # Clear any positioning or velocity moves
+        self.writeInt('XTARGET', self.readInt('XACTUAL'))
+        self.writeInt('VMAX', 0)
+
+        # Restore SW_MODE
+        self['chipregs/SWMODE'].curval = sw_mode
+        self.writeInt('SWMODE', None)
+
+        self.enableOutput(False)
+
     def close(self):
         super().close()
         if self.mypio:
             self.pg.stop()
         self.pg=None
+

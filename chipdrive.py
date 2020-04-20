@@ -234,7 +234,20 @@ class tmc5130(trinamicDriver.TrinamicDriver):
         self.enableOutput(True)
         self.readWriteMultiple(regupdates,'W')
 
-    def stop(self):
+    def stop_here(self):
+        """
+        Terminates motion softly by setting the current position as the new stop target.  Waits for positioning to
+        complete.
+
+        Driver will ramp down to zero velocity and then position the rotor back to the new stop target.
+        """
+        self.writeInt('XTARGET', self.readInt('XACTUAL'))
+        self.writeInt('VMAX', round(self.RPMtoVREG(self['settings/maxrpm'].getCurrent())))
+        self.writeInt('RAMPMODE', tmc5130regs.RAMPmode.POSITION)
+        self.waitStop(ticktime=.1)
+        self.enableOutput(False)
+
+    def soft_stop(self):
         """
         Terminates motion using a soft stop. Waits for ramp down to complete.
 

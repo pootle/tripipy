@@ -581,6 +581,16 @@ class triMixed(triRegister):
         zap=self.curval & ~self.flagmask
         self.curval = zap | flags.value
 
+    def toggleFlag(self, flag):
+        """
+        Toggles the flag bit
+        """
+        assert not self.flagmask is None
+        flags = self.flagClass(self.curval & self.flagmask)
+        flags ^= flag
+        zap = self.curval & ~self.flagmask
+        self.curval = zap | flags.value
+
     def loadBytes(self, ba):
         self.curval=self.unpackBytes(ba)
 

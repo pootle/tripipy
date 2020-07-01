@@ -102,7 +102,7 @@ class tmc5130(trinamicDriver.TrinamicDriver):
     """
     A class specific to the TMC5130 chip. The detailed register definitions are held in the tmc5130regs module.
     """
-    def __init__(self, clockfrequ=15000000, settings=motor28BYJ_48, pigio=None, loglvl=logging.DEBUG):
+    def __init__(self, clockfrequ=15000000, settings=motor28BYJ_48, pigio=None, drvenpin=12, spiChannel=1, loglvl=logging.DEBUG):
         """
         sets up a motor driver for the trinamic tm,c5130
         
@@ -114,6 +114,10 @@ class tmc5130(trinamicDriver.TrinamicDriver):
         
         loglvl       : sets the level used as the minimum for debug calls (no debug calls are made for levels below this value to improve
                         performance)
+        
+        drvenpin     : broadcom pin to enable output drive for this motor - passed through
+        
+        spiChannel   : spi channel for this motor - passed through
         """
         logging.basicConfig(
             level=logging.DEBUG if isinstance(loglvl, str) else loglvl, 
@@ -131,7 +135,7 @@ class tmc5130(trinamicDriver.TrinamicDriver):
         self.clockfrequ=clockfrequ
         self.tconst=self.clockfrequ/2**24
         super().__init__(name='fred', parent=None, app=None, clockfrequ=self.clockfrequ, datarate=1000000, pigp=self.pg,
-                motordef=tmc5130regs.tmc5130, drvenpin=12, spiChannel=1, loglvl=loglvl )
+                motordef=tmc5130regs.tmc5130, drvenpin=drvenpin, spiChannel=spiChannel, loglvl=loglvl )
         self.makeChild(_cclass=treedict.Tree_dict, name='settings', childdefs=settings)
         self['chipregs/IHOLD_IRUN/IHOLD'].set(10)
         self['chipregs/IHOLD_IRUN/IRUN'].set(15)

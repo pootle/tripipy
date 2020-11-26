@@ -1,7 +1,7 @@
 import guizero as gz
 import time
-import chipdrive
-import tmc5130regs
+from tripipy import chipdrive
+from tripipy import tmc5130regs
 import sys
 
 
@@ -286,11 +286,13 @@ class Example():
         self.motorpan.close()
 
 
-
-
 def main():
     """
     Entry point
     """
     ex = Example()
     ex.run()
+
+
+if __name__ == '__main__':
+    main()

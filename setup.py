@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 
 from setuptools import find_packages, setup
-import os
 
-# You need install_requires if you don't have a ROS environment
-install_requires = [  # ] if os.environ.get('AMENT_PREFIX_PATH') else [
+install_requires = [
     # build
     'setuptools',
     # runtime
-    'python3-pigpio',
+    # 'python3-pigpio', # this is a apt repo, run sudo apt install python3-pigpio to make it work
     'guizero'
 ]
 
@@ -41,7 +39,7 @@ d = setup(
     tests_require=tests_require,
     entry_points={
         'console_scripts': [
-            'py-trees-render = examples.motors2:main',
+            'tripipy-example = examples.motors2:main',
         ],
     },
 )

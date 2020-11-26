@@ -4,12 +4,6 @@ import chipdrive
 import tmc5130regs
 import sys
 
-def ticker():
-    el=time.time()-starttime
-    elm=int(el/60)
-    els=int(el-elm*60)
-    elapsed.value='%2d:%2d' %(elm, els)
-    motorpan.ticker()
 
 class Ftext(gz.Text):
     """
@@ -170,43 +164,7 @@ class Button(gz.PushButton):
         assert callable(cmd)
         super().__init__(master=mpanel.panel, command=cmd, **kwargs)
 
-"""
-defines the fields setup for each motor. Each entry a list of 4.
-The  are used by the app to setup the labels for the fields:
-0: Name of the field - used by the motor class to identify each field
 
-The next 2 are used to setup the label for the field
-1: class used for the label for the row ( 1 column per motor)
-2: keyword args for the label cell, the grid position is added when the constructor is called
-
-The last 2 are used by the motor class to setup its values for each field
-3: class used for cell displaying this motor's value for the field
-4: keyword args for the value cell.
-"""
-motorfields=(
-    ('motor',    gz.Text, {'text': 'motor:',     'align': 'right'}, FmotorName,  {}),
-    ('runtype',  gz.Text, {'text': 'run type:',  'align': 'right'}, EdChoice,    {'options': ['goto target', 'run forward', 'run reverse']}),
-    ('speed',    gz.Text, {'text': 'speed:',     'align': 'right'}, EdChoice,    {'options': ['max rpm', 'real time', 'double speed', 'sidereal time', 'target']}),
-    ('userpm',   gz.Text, {'text': 'target rpm:','align': 'right'}, EdFloat,     {'minval': -100000, 'maxval': 1000000, 'align': 'left'}),
-    ('targetpos',gz.Text, {'text': 'target posn:','align': 'right'}, EdFloat,    {'minval':None, 'maxval': None, 'align': 'left'}),
-    ('action',   gz.Text, {'text': 'do it NOW!', 'align': 'right'}, Button,      {'text': 'ACTION!', 'command': '../actionButton'}),
-    ('reversed', gz.Text, {'text': 'swap direction:','align':'right'},CheckBox,  {'command': '../flipdir'}),
-    ('stat_atpos',gz.Text,{'text': 'at posn'},                      BitField,    {'motorfield': 'chipregs/SHORTSTAT', 'flagbit': tmc5130regs.statusFlags.at_position,}),
-    ('stat_atmax',gz.Text,{'text': 'at max rpm'},                   BitField,    {'motorfield': 'chipregs/SHORTSTAT', 'flagbit': tmc5130regs.statusFlags.at_VMAX,}),
-    ('posn',     gz.Text, {'text': 'time:',      'align': 'right'}, TimeField,   {'motorfield':'settings/posn', 'format': '{hours:02d}:{mins:02d}:{secs:02d}', 'align':'left'}),
-    ('XACTUAL',  gz.Text, {'text': 'XACTUAL:',   'align': 'right'}, Ffield,      {'motorfield': 'chipregs/XACTUAL', 'format': '{:7d}', 'align': 'left'}),
-    ('XTARGET',  gz.Text, {'text': 'XTARGET:',   'align': 'right'}, Ffield,      {'motorfield': 'chipregs/XTARGET', 'format': '{:7d}', 'align': 'left'}),
-    ('currpm',   gz.Text, {'text': 'current rpm:','align':'right'}, Ffield,      {'motorfield': 'settings/rpmnow', 'format': '{:5.2f}', 'align': 'left'}),
-    ('VACTUAL',  gz.Text, {'text': 'VACTUAL',    'align': 'right'}, Ffield,      {'motorfield': 'chipregs/VACTUAL', 'format': '{:7d}', 'align': 'left'}),
-    ('loadtemp', gz.Text, {'text': 'load / temp:','align':'right'}, Ffield,      {'motorfield': 'chipregs/DRVSTATUS/SG_RESULT', 'format': '{:5d}', 'align':'left'}),
-    ('maxrpm',   gz.Text, {'text': 'max rpm:',   'align': 'right'}, Ffield,      {'motorfield': 'settings/maxrpm', 'format': '{:5.2f}'}),
-    ('startrpm', gz.Text, {'text': 'start rpm:', 'align': 'right'}, CalcField,   {'motorfield': 'chipregs/VSTART', 'format': '{:5.2f}'}),
-    ('VMAX',     gz.Text, {'text': 'VMAX:',      'align': 'right'}, Ffield,      {'motorfield': 'chipregs/VMAX', 'format': '{:d}'}),
-    ('VSTART',   gz.Text, {'text': 'VSTART:',    'align': 'right'}, Ffield,      {'motorfield': 'chipregs/VSTART', 'format': '{:d}'}),
-    ('v1rpm',    gz.Text, {'text': 'V1 rpm:',    'align': 'right'}, CalcField,   {'motorfield': 'chipregs/V1', 'format': '{:5.2f}'}),
-    ('stoprpm',  gz.Text, {'text': 'stop rpm:',  'align': 'right'}, CalcField,   {'motorfield': 'chipregs/VSTOP', 'format': '{:5.2f}'}),
-    ('VSTOP',    gz.Text, {'text': 'VSTOP:',     'align': 'right'}, Ffield,      {'motorfield': 'chipregs/VSTOP', 'format': '{:d}'})
-)
 
 class motorPanel():
     def __init__(self, motor, gridx, pfields, panel):
@@ -257,18 +215,82 @@ class motorPanel():
         else:
             raise ValueError('rtype oops '+ rtype)
 
-app = gz.App(title="Motor testing")
-starttime=time.time()
-header=gz.Box(app, align='top', width='fill')
-elapsed = gz.Text(header, text="clock here", align='right')
-mpanel=gz.Box(app, align='left', layout='grid')
 
-pfields={}
-for y, field in enumerate(motorfields):
-    l=field[1](mpanel, grid=[0,y], **field[2])
-    pfields[field[0]]={'y':y, 'class': field[3], 'kwargs': field[4],}
-motorpan=motorPanel(motor=chipdrive.tmc5130(), gridx=1, pfields=pfields, panel=mpanel) #loglvl='rawspi'
-app.repeat(1000, ticker)
-app.display()
-print('shutting down')
-motorpan.close()
+class Example():
+    def __init__(self):
+
+        self.elapsed = None
+        self.motorpan = None
+        self.starttime = None
+
+        """
+        defines the fields setup for each motor. Each entry a list of 4.
+        The  are used by the app to setup the labels for the fields:
+        0: Name of the field - used by the motor class to identify each field
+
+        The next 2 are used to setup the label for the field
+        1: class used for the label for the row ( 1 column per motor)
+        2: keyword args for the label cell, the grid position is added when the constructor is called
+
+        The last 2 are used by the motor class to setup its values for each field
+        3: class used for cell displaying this motor's value for the field
+        4: keyword args for the value cell.
+        """
+        self.motorfields=(
+            ('motor',    gz.Text, {'text': 'motor:',     'align': 'right'}, FmotorName,  {}),
+            ('runtype',  gz.Text, {'text': 'run type:',  'align': 'right'}, EdChoice,    {'options': ['goto target', 'run forward', 'run reverse']}),
+            ('speed',    gz.Text, {'text': 'speed:',     'align': 'right'}, EdChoice,    {'options': ['max rpm', 'real time', 'double speed', 'sidereal time', 'target']}),
+            ('userpm',   gz.Text, {'text': 'target rpm:','align': 'right'}, EdFloat,     {'minval': -100000, 'maxval': 1000000, 'align': 'left'}),
+            ('targetpos',gz.Text, {'text': 'target posn:','align': 'right'}, EdFloat,    {'minval':None, 'maxval': None, 'align': 'left'}),
+            ('action',   gz.Text, {'text': 'do it NOW!', 'align': 'right'}, Button,      {'text': 'ACTION!', 'command': '../actionButton'}),
+            ('reversed', gz.Text, {'text': 'swap direction:','align':'right'},CheckBox,  {'command': '../flipdir'}),
+            ('stat_atpos',gz.Text,{'text': 'at posn'},                      BitField,    {'motorfield': 'chipregs/SHORTSTAT', 'flagbit': tmc5130regs.statusFlags.at_position,}),
+            ('stat_atmax',gz.Text,{'text': 'at max rpm'},                   BitField,    {'motorfield': 'chipregs/SHORTSTAT', 'flagbit': tmc5130regs.statusFlags.at_VMAX,}),
+            ('posn',     gz.Text, {'text': 'time:',      'align': 'right'}, TimeField,   {'motorfield':'settings/posn', 'format': '{hours:02d}:{mins:02d}:{secs:02d}', 'align':'left'}),
+            ('XACTUAL',  gz.Text, {'text': 'XACTUAL:',   'align': 'right'}, Ffield,      {'motorfield': 'chipregs/XACTUAL', 'format': '{:7d}', 'align': 'left'}),
+            ('XTARGET',  gz.Text, {'text': 'XTARGET:',   'align': 'right'}, Ffield,      {'motorfield': 'chipregs/XTARGET', 'format': '{:7d}', 'align': 'left'}),
+            ('currpm',   gz.Text, {'text': 'current rpm:','align':'right'}, Ffield,      {'motorfield': 'settings/rpmnow', 'format': '{:5.2f}', 'align': 'left'}),
+            ('VACTUAL',  gz.Text, {'text': 'VACTUAL',    'align': 'right'}, Ffield,      {'motorfield': 'chipregs/VACTUAL', 'format': '{:7d}', 'align': 'left'}),
+            ('loadtemp', gz.Text, {'text': 'load / temp:','align':'right'}, Ffield,      {'motorfield': 'chipregs/DRVSTATUS/SG_RESULT', 'format': '{:5d}', 'align':'left'}),
+            ('maxrpm',   gz.Text, {'text': 'max rpm:',   'align': 'right'}, Ffield,      {'motorfield': 'settings/maxrpm', 'format': '{:5.2f}'}),
+            ('startrpm', gz.Text, {'text': 'start rpm:', 'align': 'right'}, CalcField,   {'motorfield': 'chipregs/VSTART', 'format': '{:5.2f}'}),
+            ('VMAX',     gz.Text, {'text': 'VMAX:',      'align': 'right'}, Ffield,      {'motorfield': 'chipregs/VMAX', 'format': '{:d}'}),
+            ('VSTART',   gz.Text, {'text': 'VSTART:',    'align': 'right'}, Ffield,      {'motorfield': 'chipregs/VSTART', 'format': '{:d}'}),
+            ('v1rpm',    gz.Text, {'text': 'V1 rpm:',    'align': 'right'}, CalcField,   {'motorfield': 'chipregs/V1', 'format': '{:5.2f}'}),
+            ('stoprpm',  gz.Text, {'text': 'stop rpm:',  'align': 'right'}, CalcField,   {'motorfield': 'chipregs/VSTOP', 'format': '{:5.2f}'}),
+            ('VSTOP',    gz.Text, {'text': 'VSTOP:',     'align': 'right'}, Ffield,      {'motorfield': 'chipregs/VSTOP', 'format': '{:d}'})
+        )
+
+    def ticker(self):
+        el=time.time()-self.starttime
+        elm=int(el/60)
+        els=int(el-elm*60)
+        self.elapsed.value='%2d:%2d' %(elm, els)
+        self.motorpan.ticker()
+
+    def run(self):
+        app = gz.App(title="Motor testing")
+        self.starttime = time.time()
+        header = gz.Box(app, align='top', width='fill')
+        self.elapsed = gz.Text(header, text="clock here", align='right')
+        mpanel = gz.Box(app, align='left', layout='grid')
+
+        pfields = {}
+        for y, field in enumerate(self.motorfields):
+            l = field[1](mpanel, grid=[0, y], **field[2])
+            pfields[field[0]] = {'y': y, 'class': field[3], 'kwargs': field[4], }
+        self.motorpan = motorPanel(motor=chipdrive.tmc5130(), gridx=1, pfields=pfields, panel=mpanel)  # loglvl='rawspi'
+        app.repeat(1000, self.ticker)
+        app.display()
+        print('shutting down')
+        self.motorpan.close()
+
+
+
+
+def main():
+    """
+    Entry point
+    """
+    ex = Example()
+    ex.run()

@@ -45,24 +45,30 @@ There are 5 python files:
 
 
 # Installation
+- install python3-pigpio: 
+```
+sudo apt install python3-pigpio
+```
 
 - git clone this repository or download the zip file and unzip it.
+- install it:
+```
+cd /<path_to_tripipy>/
+sudo ./setup.py install
+```
 
-- install python3-pigpio
 
-- install guizero
 
 # demo use
-cd to the directory containing the 3 python files.
 
-start the pigpio daemon if it is not already running I use `sudo gpiod -c 256`
+start the pigpio daemon if it is not already running I use `sudo gpiod -c 256` or `sudo pigpio`
 
 At the moment the gpio pins have defaults defined in the trinamicDriver module around line 36. These can be changed in the
 chipdrive module when it instantiates the class around line 133.
 
 run the app:
 
-`python3 motor2.py`
+`tripipy-example`
 
 Select the mode to use:
 

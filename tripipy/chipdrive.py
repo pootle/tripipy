@@ -15,10 +15,10 @@ import sys
 from collections import OrderedDict
 from enum import IntFlag, auto
 
-import treedict
-import trinamicDriver, tmc5130regs
+from tripipy import treedict
+from tripipy import trinamicDriver, tmc5130regs
 
-from tmc5130regs import statusFlags as motorStatus
+from tripipy.tmc5130regs import statusFlags as motorStatus
 
 class regFlags(IntFlag):
     NONE        =0

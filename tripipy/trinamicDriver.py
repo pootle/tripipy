@@ -14,7 +14,7 @@ import logging
 import pigpio
 import time
 from enum import IntFlag, auto
-import treedict
+from tripipy import treedict
 
 class TrinamicDriver(treedict.Tree_dict):
     """

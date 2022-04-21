@@ -1,3 +1,7 @@
 *.py~
 *.md~
-__pycache__/*
+*/__pycache__/*
+build/*
+dist/*
+tripipy.egg-info/*
+.idea/*

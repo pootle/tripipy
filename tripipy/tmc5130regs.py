@@ -6,7 +6,7 @@ This is based on the TMC5130A DATASHEET (Rev. 1.15 / 2018-JUL-11)
 """
 
 from enum import Enum, IntFlag
-from trinamicDriver import triHex, triByteFlags, triSignedint, triPosint, triMixed, triSubInt, triEnum
+from tripipy.trinamicDriver import triHex, triByteFlags, triSignedint, triPosint, triMixed, triSubInt, triEnum
 
 addr="addr"
 mode="mode"
